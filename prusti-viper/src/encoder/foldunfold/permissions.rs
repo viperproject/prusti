@@ -250,8 +250,11 @@ impl RequiredPermissionsGetter for vir::Expr {
                 vec![guard, left, right].get_required_permissions(predicates)
             }
 
-            vir::Expr::LetExpr(_variable, _expr, _body, _) => {
-                unreachable!("Let expressions should be introduced after fold/unfold.");
+            vir::Expr::LetExpr(_, expr, body, _) => {
+                std::iter::empty()
+                    .chain(expr.get_required_permissions(predicates))
+                    .chain(body.get_required_permissions(predicates))
+                    .collect()
             }
 
             vir::Expr::ForAll(vars, _triggers, box body, _) => {
@@ -423,8 +426,11 @@ impl ExprPermissionsGetter for vir::Expr {
                 HashSet::new()
             }
 
-            vir::Expr::LetExpr(ref _variable, ref _expr, ref _body, _) => {
-                unreachable!("Let expressions should be introduced after fold/unfold.");
+            vir::Expr::LetExpr(_, ref expr, ref body, _) => {
+                std::iter::empty()
+                    .chain(expr.get_permissions(predicates))
+                    .chain(body.get_permissions(predicates))
+                    .collect()
             }
         }
     }

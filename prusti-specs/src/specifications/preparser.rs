@@ -119,7 +119,7 @@ impl ParserStream {
                 if punct.as_char() != c {
                     return false;
                 }
-                
+
                 // This code is disabled due to pretty-printing the implies operator and then
                 // parsing it as == >. Possibly this gets fixed in the future, for now, we
                 // recognize both ==> and == > as implies operators. Related issue:
@@ -609,33 +609,12 @@ impl Parser {
             return Err(self.error_expected_comma());
         }
         self.input.check_and_consume_operator(",");
-        let rhs = self.extract_assertion()?;
-        pledge.lhs = Some(pledge.rhs.clone());
-        pledge.rhs = rhs;
+        pledge.rhs = self.extract_assertion()?;
         Ok(pledge)
     }
     pub fn extract_pledge_rhs_only(&mut self) -> syn::Result<PledgeWithoutId> {
-        let mut reference = None;
-        if self.input.contains_operator("=>") {
-            let ref_stream = self.input.create_stream_until("=>");
-            let parsed_expr = self.parse_rust_expression(ref_stream)?;
-
-            let expr = ExpressionWithoutId {
-                spec_id: common::SpecificationId::dummy(),
-                id: (),
-                expr: parsed_expr,
-            };
-            reference = Some(expr);
-            self.input.check_and_consume_operator("=>");
-        }
-
         let assertion = self.extract_assertion()?;
-
-        Ok(PledgeWithoutId {
-            reference,
-            lhs: None,
-            rhs: assertion
-        })
+        Ok(PledgeWithoutId { rhs: assertion })
     }
     /// Convert all conjuncts into And assertion.
     fn conjuncts_to_assertion(&mut self) -> syn::Result<AssertionWithoutId> {

@@ -235,13 +235,8 @@ pub enum AssertionKind<EID, ET, AT> {
 }
 
 #[derive(Debug, Clone)]
-/// Pledge `after_expiry(ref => rhs)`
-///     or `after_expiry_if(ref => lhs, rhs)`
+/// Pledge `pledge(rhs)`
 pub struct Pledge<EID, ET, AT> {
-    /// The ref.
-    pub reference: Option<Expression<EID, ET>>,
-    /// The body lhs.
-    pub lhs: Option<Assertion<EID, ET, AT>>,
     /// The body rhs.
     pub rhs: Assertion<EID, ET, AT>,
 }

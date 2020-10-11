@@ -3,6 +3,7 @@ use rustc_middle::mir;
 use rustc_middle::ty;
 
 use super::TupleItemsForTy;
+use super::PlaceAddProjection;
 
 pub trait SplitAggregateAssignment<'tcx> {
     /// Transforms an assignment into its atomic parts. For a normal assignment like

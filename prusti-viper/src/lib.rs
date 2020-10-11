@@ -25,6 +25,9 @@ extern crate rustc_attr;
 #[macro_use]
 extern crate lazy_static;
 
+#[macro_use]
+mod vir_macro;
+
 pub mod encoder;
 mod utils;
 pub mod verifier;

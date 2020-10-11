@@ -375,12 +375,12 @@ impl ast::ExprFolder for ExprOptimizer {
     }
     fn fold_magic_wand(
         &mut self,
-        _lhs: Box<ast::Expr>,
-        _rhs: Box<ast::Expr>,
-        _borrow: Option<borrows::Borrow>,
-        _pos: ast::Position,
+        lhs: Box<ast::Expr>,
+        rhs: Box<ast::Expr>,
+        borrow: Option<borrows::Borrow>,
+        pos: ast::Position,
     ) -> ast::Expr {
-        unimplemented!()
+        ast::Expr::MagicWand(lhs, rhs, borrow, pos)
     }
     fn fold_predicate_access_predicate(
         &mut self,

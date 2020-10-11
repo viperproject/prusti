@@ -6,10 +6,11 @@
 
 //! Fix ghost variables.
 
+use std::collections::HashMap;
+use std::mem;
+
 use super::super::ast;
 use super::super::cfg;
-use std::collections::HashSet;
-use std::mem;
 
 /// Viper has a consistency check that only variables declared inside
 /// the package statement can be assigned in it. Since these ghost
@@ -21,10 +22,14 @@ use std::mem;
 pub fn fix_ghost_vars(
     mut method: cfg::CfgMethod
 ) -> cfg::CfgMethod {
-    let mut fixer = GhostVarFixer {
-        package_stmt_count: 0,
-        vars: None,
-    };
+    // TODO: Renaming variables interferes with let-bindings around magic wands. For example:
+    //    package [lhs1] --* ([lhs2] --* x == 0) {
+    //      var x: Int := 0
+    //      package [lhs] --* x == 0 { ... }
+    //    }
+    //  Renaming x in the package statement means that the outer magic wand cannot be packaged
+    //  anymore, because the inner magic wand cannot be found due to the renamed variable.
+    let mut fixer = GhostVarFixer::default();
     let mut sentinel_stmt = ast::Stmt::Comment(String::from("moved out stmt"));
     for block in &mut method.basic_blocks {
         for stmt in &mut block.stmts {
@@ -36,30 +41,30 @@ pub fn fix_ghost_vars(
     method
 }
 
+#[derive(Default)]
 struct GhostVarFixer {
-    /// A counter that assigns a unique number to each package statement.
-    package_stmt_count: u32,
-    /// A set of variables declared inside a package stmt that should be
-    /// renamed.
-    vars: Option<HashSet<ast::LocalVar>>,
+    /// This is a stack of local variable replacements. The topmost mapping corresponds to the
+    /// current package block, the next mapping corresponds to the parent package block, and so on.
+    levels: Vec<HashMap<ast::LocalVar, ast::LocalVar>>,
 }
 
 impl GhostVarFixer {
-    fn fix_name(&self, mut local_var: ast::LocalVar) -> ast::LocalVar {
-        local_var
-            .name
-            .push_str(&format!("$p{}", self.package_stmt_count));
-        local_var
-    }
-}
-
-impl ast::ExprFolder for GhostVarFixer {
-    fn fold_local(&mut self, local_var: ast::LocalVar, pos: ast::Position) -> ast::Expr {
-        match self.vars {
-            Some(ref vars) if vars.contains(&local_var) => {
-                ast::Expr::Local(self.fix_name(local_var), pos)
+    fn fix_variable(&mut self, var: ast::LocalVar) {
+        if var.name.starts_with("et$") {
+            // TODO: This variable is also used in a let-binding in the expiration tool. Renaming
+            //  it would break everything. This should be done differently, but time is scarce.
+            return
+        }
+        for level in &mut self.levels {
+            if level.contains_key(&var) {
+                return
             }
-            _ => ast::Expr::Local(local_var, pos),
+        }
+        let current_level_index = self.levels.len();
+        if let Some(current_level) = self.levels.last_mut() {
+            let mut fixed_var = var.clone();
+            fixed_var.name.push_str(&format!("$p{}", current_level_index));
+            current_level.insert(var, fixed_var);
         }
     }
 }
@@ -67,6 +72,14 @@ impl ast::ExprFolder for GhostVarFixer {
 impl ast::StmtFolder for GhostVarFixer {
     fn fold_expr(&mut self, e: ast::Expr) -> ast::Expr {
         ast::ExprFolder::fold(self, e)
+    }
+
+    fn fold_assign(&mut self, p: ast::Expr, e: ast::Expr, k: ast::AssignKind) -> ast::Stmt {
+        match &p {
+            ast::Expr::Local(var, _) => self.fix_variable(var.clone()),
+            _ => {},
+        }
+        ast::Stmt::Assign(self.fold_expr(p), self.fold_expr(e), k)
     }
 
     fn fold_package_magic_wand(
@@ -78,14 +91,25 @@ impl ast::StmtFolder for GhostVarFixer {
         pos: ast::Position,
     ) -> ast::Stmt {
         let wand = self.fold_expr(wand);
-        self.vars = Some(vars.into_iter().collect());
+
+        self.levels.push(HashMap::new());
+
         let body = body.into_iter().map(|stmt| self.fold(stmt)).collect();
-        let unfixed_vars = self.vars.take().unwrap();
-        let vars = unfixed_vars
-            .into_iter()
-            .map(|var| self.fix_name(var))
-            .collect();
-        self.package_stmt_count += 1;
+
+        let fixed_vars = self.levels.pop().unwrap().into_iter()
+            .map(|(_, fixed_var)| fixed_var);
+
+        let vars = std::iter::empty().chain(vars).chain(fixed_vars).collect();
         ast::Stmt::PackageMagicWand(wand, body, label, vars, pos)
+    }
+}
+
+impl ast::ExprFolder for GhostVarFixer {
+    fn fold_local(&mut self, local_var: ast::LocalVar, pos: ast::Position) -> ast::Expr {
+        let fixed_var = self.levels.iter().rev()
+            .filter_map(|var_mapping| var_mapping.get(&local_var))
+            .cloned()
+            .next().unwrap_or(local_var);
+        ast::Expr::Local(fixed_var, pos)
     }
 }

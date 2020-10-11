@@ -646,14 +646,24 @@ impl<'p, 'v: 'p, 'tcx: 'v> BackwardMirInterpreter<'tcx>
 
                             "prusti_contracts::before_expiry" => {
                                 trace!("Encoding before_expiry expression {:?}", args[0]);
-                                assert_eq!(args.len(), 1);
-                                let encoded_rhs = self
-                                    .mir_encoder
-                                    .encode_old_expr(encoded_args[0].clone(), WAND_LHS_LABEL);
+                                let label = format!("before_expiry/xxx");
+                                let encoded_rhs = self.mir_encoder.encode_old_expr(
+                                    encoded_args.last().unwrap().clone(), &label);
                                 let mut state = states[&target_block].clone();
                                 state.substitute_value(&lhs_value, encoded_rhs);
                                 state
                             }
+
+                            "prusti_contracts::after_unblocked" => {
+                                trace!("Encoding after_unblocked expression {:?}", args[0]);
+                                let label = format!("after_unblocked/xxx");
+                                let encoded_rhs = self.mir_encoder.encode_old_expr(
+                                    encoded_args.last().unwrap().clone(), &label);
+                                let mut state = states[&target_block].clone();
+                                state.substitute_value(&lhs_value, encoded_rhs);
+                                state
+                            }
+                            
                             // simple function call
                             _ => {
                                 let mut is_cmp_call = false;

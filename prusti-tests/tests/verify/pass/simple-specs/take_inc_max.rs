@@ -4,10 +4,10 @@ use prusti_contracts::*;
 /// authored by Yusuke Matsushita, Takeshi Tsukada, and Naoki Kobayashi
 
 #[ensures(*result >= old(*ma) && *result >= old(*mb))]
-#[after_expiry(if old(*ma >= *mb) {
-        (*ma == before_expiry(*result) && *mb == old(*mb))
+#[pledge(if old(*ma >= *mb) {
+        (after_unblocked(*ma) == before_expiry(*result) && after_unblocked(*mb) == old(*mb))
     } else {
-        (*ma == old(*ma) && *mb == before_expiry(*result))
+        (after_unblocked(*ma) == old(*ma) && after_unblocked(*mb) == before_expiry(*result))
     })]
 fn take_max<'a>(ma: &'a mut i32, mb: &'a mut i32) -> &'a mut i32 {
     if *ma >= *mb { ma } else { mb }

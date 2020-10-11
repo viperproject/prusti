@@ -1,10 +1,10 @@
 use super::common::{self, ExpressionIdGenerator};
-use proc_macro2::{TokenStream, Span, Spacing, Punct};
+use proc_macro2::{TokenStream, Group, Span, Spacing, Punct, TokenTree, Delimiter};
 use quote::{quote_spanned, ToTokens, TokenStreamExt};
 use std::collections::HashMap;
 use syn::parse::{Parse, ParseStream};
 use syn::spanned::Spanned;
-
+use quote::quote;
 pub use common::{ExpressionId, SpecType, SpecificationId};
 pub use super::preparser::{Parser, Arg};
 use crate::specifications::common::ForAllVars;
@@ -120,29 +120,81 @@ impl Parse for common::Assertion<(), syn::Expr, Arg> {
 impl Pledge {
     pub(crate) fn parse(
         tokens: TokenStream,
-        spec_id_lhs: Option<SpecificationId>,
         spec_id_rhs: SpecificationId,
         id_generator: &mut ExpressionIdGenerator,
     ) -> syn::Result<Self> {
+        let tokens = Self::replace_special_syntax_ts(tokens);
         let mut parser = Parser::from_token_stream(tokens);
-        let pledge = if let Some(spec_id_lhs) = spec_id_lhs {
-            let pledge = parser.extract_pledge()?;
-            Pledge {
-                reference: pledge.reference.assign_id(spec_id_rhs, id_generator),
-                lhs: pledge.lhs.assign_id(spec_id_lhs, id_generator),
-                rhs: pledge.rhs.assign_id(spec_id_rhs, id_generator),
-            }
-        }
-        else {
-            let pledge = parser.extract_pledge_rhs_only()?;
-            assert!(pledge.lhs.is_none());
-            Pledge {
-                reference: pledge.reference.assign_id(spec_id_rhs, id_generator),
-                lhs: None,
-                rhs: pledge.rhs.assign_id(spec_id_rhs, id_generator),
-            }
+        let pledge = parser.extract_pledge_rhs_only()?;
+        let pledge = Pledge {
+            rhs: pledge.rhs.assign_id(spec_id_rhs, id_generator),
         };
         Ok(pledge)
+    }
+
+    /// Pledges can use the `before_expiry[ref](expr)` and `after_unblocked[ref](expr)` syntax,
+    /// which is not proper Rust syntax. This function takes a token stream and returns a new
+    /// token stream with the following replacements:
+    ///  - `before_expiry[ref](expr)` -> `before_expiry(&ref, expr)`
+    ///  - `after_unblocked[ref](expr)` -> `after_unblocked(&ref, expr)`
+    ///  - `before_expiry(expr)` -> `before_expiry(0, expr)`
+    ///  - `after_unblocked(expr)` -> `after_unblocked(0, expr)`.
+    fn replace_special_syntax_ts(ts: TokenStream) -> TokenStream {
+        enum State { A, B, C { reference: TokenStream } }
+        use State::*;
+        fn extend(
+            mut ts: TokenStream,
+            newts: impl Into<TokenStream>
+        ) -> TokenStream {
+            ts.extend(newts.into()); ts
+        }
+
+        let (_, ts) = ts.into_iter().fold(
+            (A, TokenStream::new()),
+            |(state, ts), tt| match state {
+                A => match &tt {
+                    TokenTree::Ident(ident) => match ident.to_string().as_str() {
+                        "before_expiry" => (B, extend(ts, tt)),
+                        "after_unblocked" => (B, extend(ts, tt)),
+                        _ => (A, extend(ts, tt))
+                    },
+                    _ => (A, extend(ts, Self::replace_special_syntax_tt(tt)))
+                },
+                B => match &tt {
+                    TokenTree::Group(group) => match group.delimiter() {
+                        Delimiter::Bracket => (C { reference: group.stream() }, ts),
+                        Delimiter::Parenthesis => {
+                            let expression = Self::replace_special_syntax_ts(group.stream());
+                            (A, extend(ts, quote_spanned! { group.span() => (0, #expression) }))
+                        }
+                        _ => (A, extend(ts, tt)),
+                    },
+                    _ => (A, extend(ts, tt))
+                },
+                C { reference } => match &tt {
+                    TokenTree::Group(group) => match group.delimiter() {
+                        Delimiter::Parenthesis => {
+                            let reference = quote_spanned! { reference.span() => &#reference };
+                            let expression = group.stream();
+                            (A, extend(ts, quote! { (#reference, #expression) }))
+                        }
+                        _ => (A, extend(ts, tt)),
+                    },
+                    _ => (A, extend(ts, tt))
+                },
+            }
+        );
+        ts
+    }
+
+    fn replace_special_syntax_tt(tt: TokenTree) -> TokenTree {
+        match &tt {
+            TokenTree::Group(group) => {
+                let ts = Self::replace_special_syntax_ts(group.stream());
+                TokenTree::Group(Group::new(group.delimiter(), ts))
+            }
+            _ => tt
+        }
     }
 }
 

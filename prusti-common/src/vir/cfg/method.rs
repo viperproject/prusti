@@ -199,6 +199,12 @@ impl CfgMethod {
         candidate_name
     }
 
+    pub fn add_fresh_label(&mut self) -> String {
+        let name = self.get_fresh_label_name();
+        self.labels.insert(name.to_string());
+        name
+    }
+
     /// Returns all formal arguments, formal returns, and local variables
     pub fn get_all_vars(&self) -> Vec<LocalVar> {
         let mut vars: Vec<LocalVar> = vec![];

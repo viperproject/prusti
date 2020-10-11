@@ -173,7 +173,17 @@ impl<'p, 'v: 'p, 'tcx: 'v> FoldUnfold<'p, 'v, 'tcx> {
         pctxt: &PathCtxt<'p>,
     ) -> Result<vir::Stmt, FoldUnfoldError> {
         trace!("[enter] rewrite_stmt_with_unfoldings_in_old: {}", stmt);
-        let result = stmt.fallible_map_expr(|e| self.replace_old_expr(&e, pctxt))?;
+        let result = match stmt {
+            vir::Stmt::PackageMagicWand(magic_wand, stmts, label, vars, pos) => {
+                let magic_wand = self.replace_old_expr(&magic_wand, pctxt)?;
+                vir::Stmt::PackageMagicWand(magic_wand, stmts, label, vars, pos)
+            }
+            vir::Stmt::If(cond, then, elze) => {
+                let cond = self.replace_old_expr(&cond, pctxt)?;
+                vir::Stmt::If(cond, then, elze)
+            }
+            _ => stmt.fallible_map_expr(|e| self.replace_old_expr(&e, pctxt))?
+        };
         trace!("[exit] rewrite_stmt_with_unfoldings_in_old = {}", result);
         Ok(result)
     }
@@ -233,6 +243,10 @@ impl<'p, 'v: 'p, 'tcx: 'v> FoldUnfold<'p, 'v, 'tcx> {
                     vars,
                     pos,
                 ))
+            }
+            vir::Stmt::If(cond, then, elze) => {
+                let cond = self.replace_expr(&cond, pctxt)?;
+                Ok(vir::Stmt::If(cond, then, elze))
             }
             _ => stmt.fallible_map_expr(|e| self.replace_expr(&e, pctxt)),
         }
@@ -376,6 +390,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> FoldUnfold<'p, 'v, 'tcx> {
                             variant.clone(),
                         )
                     }
+                    vir::Stmt::Label(_) => stmt.clone(),
                     x => unreachable!("{}", x),
                 })
                 .collect()
@@ -869,7 +884,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> vir::CfgReplacer<PathCtxt<'p>, ActionVec>
         }
 
         // Delete lhs state
-        self.pctxt_at_label.remove("lhs");
+        // TODO: Stack of LHS pctxts and pop the top one if we exit a magic wand?
+        // self.pctxt_at_label.remove("lhs");
 
         debug!(
             "[exit] replace_stmt = [\n{}\n]",

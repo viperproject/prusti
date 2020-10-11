@@ -14,12 +14,7 @@ pub fn ensures(_attr: TokenStream, tokens: TokenStream) -> TokenStream {
 }
 
 #[proc_macro_attribute]
-pub fn after_expiry(_attr: TokenStream, tokens: TokenStream) -> TokenStream {
-    tokens
-}
-
-#[proc_macro_attribute]
-pub fn after_expiry_if(_attr: TokenStream, tokens: TokenStream) -> TokenStream {
+pub fn pledge(_attr: TokenStream, tokens: TokenStream) -> TokenStream {
     tokens
 }
 

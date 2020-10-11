@@ -5,8 +5,7 @@ use std::convert::TryFrom;
 pub enum SpecAttributeKind {
     Requires,
     Ensures,
-    AfterExpiry,
-    AfterExpiryIf,
+    Pledge,
     Pure,
     Trusted,
 }
@@ -18,8 +17,7 @@ impl TryFrom<String> for SpecAttributeKind {
         match name.as_str() {
             "requires" => Ok(SpecAttributeKind::Requires),
             "ensures" => Ok(SpecAttributeKind::Ensures),
-            "after_expiry" => Ok(SpecAttributeKind::AfterExpiry),
-            "after_expiry_if" => Ok(SpecAttributeKind::AfterExpiryIf),
+            "pledge" => Ok(SpecAttributeKind::Pledge),
             "pure" => Ok(SpecAttributeKind::Pure),
             "trusted" => Ok(SpecAttributeKind::Trusted),
             _ => Err(name),

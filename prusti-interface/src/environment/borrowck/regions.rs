@@ -59,17 +59,17 @@ impl PlaceRegions {
     }
 
     pub fn for_local(&self, local: mir::Local) -> Option<facts::Region> {
-        self.for_place(local.into())
+        self.for_place(&local.into())
     }
 
     /// Determines the region of a MIR place. Right now, the only supported places are locals and tuples. Tuples cannot be nested inside other tuples.
-    pub fn for_place(&self, place: mir::Place) -> Option<facts::Region> {
+    pub fn for_place(&self, place: &mir::Place) -> Option<facts::Region> {
         let (local, fields) = Self::translate_place(place);
         self.0.get(&(local, fields)).cloned()
     }
 
     /// Translates a place like _3.0.3.1 into a local (here _3) and a list of field projections like (here [0, 3, 1]).
-    fn translate_place(place: mir::Place) -> (mir::Local, Vec<usize>) {
+    fn translate_place(place: &mir::Place) -> (mir::Local, Vec<usize>) {
         let indices = place.projection.iter()
             .map(|elem| match elem {
                 mir::ProjectionElem::Field(f, _) => f.index(),

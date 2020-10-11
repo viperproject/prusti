@@ -96,7 +96,7 @@ impl<'tcx> LocalVariableManager<'tcx> {
 }
 
 /// This place is a generalisation of mir::Place.
-#[derive(Debug, Eq, PartialEq, Hash, Clone)]
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Clone)]
 pub enum Place<'tcx> {
     /// A place that is a MIR place.
     NormalPlace(mir::Place<'tcx>),
@@ -114,11 +114,31 @@ pub enum Place<'tcx> {
 
 impl<'a, 'tcx: 'a> From<&'a mir::Place<'tcx>> for Place<'tcx> {
     fn from(other: &'a mir::Place<'tcx>) -> Self {
-        Place::NormalPlace(other.clone())
+        other.clone().into()
+    }
+}
+
+impl<'tcx> From<mir::Place<'tcx>> for Place<'tcx> {
+    fn from(other: mir::Place<'tcx>) -> Self {
+        Place::NormalPlace(other)
     }
 }
 
 impl<'tcx> Place<'tcx> {
+    pub fn new_normal(place: mir::Place<'tcx>) -> Self {
+        Self::NormalPlace(place)
+    }
+
+    pub fn new_substituted(substituted_root: Local, place: mir::Place<'tcx>) -> Self {
+        Self::SubstitutedPlace { substituted_root, place }
+    }
+
+    pub fn from_place(original_root: mir::Local, mut place: mir::Place<'tcx>) -> Self {
+        let substituted_root = Local::new(place.local.index());
+        place.local = original_root;
+        Self::new_substituted(substituted_root, place)
+    }
+
     pub fn is_root(&self, local: Local) -> bool {
         // fn check_if_root(place: &mir::Place, local: Local) -> bool {
         //     match place {
@@ -136,5 +156,19 @@ impl<'tcx> Place<'tcx> {
                 substituted_root, ..
             } => *substituted_root == local,
         }
+    }
+
+    pub fn to_mir_place(&self) -> mir::Place<'tcx> {
+        match self.clone() {
+            Place::NormalPlace(place) => place,
+            Place::SubstitutedPlace { substituted_root, mut place } => {
+                place.local = substituted_root.into();
+                place
+            }
+        }
+    }
+
+    pub fn as_normal_place(&self) -> Option<&mir::Place<'tcx>> {
+        if let Place::NormalPlace(place) = self { Some(place) } else { None }
     }
 }

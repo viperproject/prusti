@@ -311,6 +311,10 @@ impl Expr {
         DefaultPosReplacer { new_pos: pos }.fold(self)
     }
 
+    pub fn const_int(x: i64) -> Self {
+        Expr::Const(Const::Int(x), Position::default())
+    }
+
     pub fn predicate_access_predicate<S: ToString>(name: S, place: Expr, perm: PermAmount) -> Self {
         let pos = place.pos();
         Expr::PredicateAccessPredicate(name.to_string(), box place, perm, pos)
@@ -450,6 +454,10 @@ impl Expr {
         pos: Position,
     ) -> Self {
         Expr::FuncApp(name, args, internal_args, return_type, pos)
+    }
+
+    pub fn domain_func_app(function: DomainFunc, args: Vec<Expr>) -> Self {
+        Expr::DomainFuncApp(function, args, Position::default())
     }
 
     pub fn magic_wand(lhs: Expr, rhs: Expr, borrow: Option<Borrow>) -> Self {

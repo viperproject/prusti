@@ -14,13 +14,8 @@ pub fn ensures(attr: TokenStream, tokens: TokenStream) -> TokenStream {
 }
 
 #[proc_macro_attribute]
-pub fn after_expiry(attr: TokenStream, tokens: TokenStream) -> TokenStream {
-    rewrite_prusti_attributes(SpecAttributeKind::AfterExpiry, attr.into(), tokens.into()).into()
-}
-
-#[proc_macro_attribute]
-pub fn after_expiry_if(attr: TokenStream, tokens: TokenStream) -> TokenStream {
-    rewrite_prusti_attributes(SpecAttributeKind::AfterExpiryIf, attr.into(), tokens.into()).into()
+pub fn pledge(attr: TokenStream, tokens: TokenStream) -> TokenStream {
+    rewrite_prusti_attributes(SpecAttributeKind::Pledge, attr.into(), tokens.into()).into()
 }
 
 #[proc_macro_attribute]

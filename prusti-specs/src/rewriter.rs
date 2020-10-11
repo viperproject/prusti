@@ -48,11 +48,10 @@ impl AstRewriter {
     /// Parse a pledge.
     pub fn parse_pledge(
         &mut self,
-        spec_id_lhs: Option<untyped::SpecificationId>,
         spec_id_rhs: untyped::SpecificationId,
         tokens: TokenStream
     ) -> syn::Result<untyped::Pledge> {
-        untyped::Pledge::parse(tokens, spec_id_lhs, spec_id_rhs, &mut self.expr_id_generator)
+        untyped::Pledge::parse(tokens, spec_id_rhs, &mut self.expr_id_generator)
     }
 
     /// Check whether function `item` contains a parameter called `keyword`. If

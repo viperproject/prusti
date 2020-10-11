@@ -83,8 +83,7 @@ fn generate_spec_and_assertions(
         let rewriting_result = match attr_kind {
             SpecAttributeKind::Requires => generate_for_requires(attr_tokens, item),
             SpecAttributeKind::Ensures => generate_for_ensures(attr_tokens, item),
-            SpecAttributeKind::AfterExpiry => generate_for_after_expiry(attr_tokens, item),
-            SpecAttributeKind::AfterExpiryIf => generate_for_after_expiry_if(attr_tokens, item),
+            SpecAttributeKind::Pledge => generate_for_pledge(attr_tokens, item),
             SpecAttributeKind::Pure => generate_for_pure(attr_tokens, item),
             SpecAttributeKind::Trusted => generate_for_trusted(attr_tokens, item),
         };
@@ -132,31 +131,12 @@ fn generate_for_ensures(attr: TokenStream, item: &untyped::AnyFnItem) -> Generat
     ))
 }
 
-/// Check if the given expression is identifier `result`.
-fn check_is_result(reference: &Option<untyped::Expression>) -> syn::Result<()> {
-    if let Some(untyped::Expression { expr, ..}) = reference {
-        if let syn::Expr::Path(syn::ExprPath { qself: None, path, ..}) = expr {
-            if path.is_ident("result") {
-                return Ok(());
-            }
-        }
-        Err(syn::Error::new(
-            expr.span(),
-            "currently only `result` is supported".to_string(),
-        ))
-    } else {
-        Ok(())
-    }
-}
-
 /// Generate spec items and attributes to typecheck and later retrieve "after_expiry" annotations.
-fn generate_for_after_expiry(attr: TokenStream, item: &untyped::AnyFnItem) -> GeneratedResult {
+fn generate_for_pledge(attr: TokenStream, item: &untyped::AnyFnItem) -> GeneratedResult {
     let mut rewriter = rewriter::AstRewriter::new();
     let spec_id_rhs = rewriter.generate_spec_id();
     let spec_id_rhs_str = format!(":{}", spec_id_rhs);
-    let pledge = rewriter.parse_pledge(None, spec_id_rhs, attr)?;
-    check_is_result(&pledge.reference)?;
-    assert!(pledge.lhs.is_none(), "after_expiry with lhs?");
+    let pledge = rewriter.parse_pledge(spec_id_rhs, attr)?;
     let spec_item_rhs = rewriter.generate_spec_item_fn(
         rewriter::SpecItemType::Postcondition,
         spec_id_rhs,
@@ -166,37 +146,6 @@ fn generate_for_after_expiry(attr: TokenStream, item: &untyped::AnyFnItem) -> Ge
     Ok((
         vec![spec_item_rhs],
         vec![parse_quote!(#[prusti::pledge_spec_id_ref = #spec_id_rhs_str])],
-    ))
-}
-
-/// Generate spec items and attributes to typecheck and later retrieve "after_expiry_if"
-/// annotations.
-fn generate_for_after_expiry_if(attr: TokenStream, item: &untyped::AnyFnItem) -> GeneratedResult {
-    let mut rewriter = rewriter::AstRewriter::new();
-    let spec_id_lhs = rewriter.generate_spec_id();
-    let spec_id_rhs = rewriter.generate_spec_id();
-    let spec_id_str = format!("{}:{}", spec_id_lhs, spec_id_rhs);
-    let pledge = rewriter.parse_pledge(
-        Some(spec_id_lhs),
-        spec_id_rhs,
-        attr
-    )?;
-    check_is_result(&pledge.reference)?;
-    let spec_item_lhs = rewriter.generate_spec_item_fn(
-        rewriter::SpecItemType::Postcondition,
-        spec_id_lhs,
-        pledge.lhs.unwrap(),
-        &item
-    )?;
-    let spec_item_rhs = rewriter.generate_spec_item_fn(
-        rewriter::SpecItemType::Postcondition,
-        spec_id_rhs,
-        pledge.rhs,
-        &item
-    )?;
-    Ok((
-        vec![spec_item_lhs, spec_item_rhs],
-        vec![parse_quote!(#[prusti::pledge_spec_id_ref = #spec_id_str])],
     ))
 }
 
