@@ -1,0 +1,40 @@
+meaning flags:
+TODO_CE : there is something todo for this counterexample
+CE_RM : this counterexample should later be removed from this 
+		testset. (e.g. because it fails pre-verification)
+
+issues functionality:
+	demos/append-sorted-error-3.rs
+		there is no counterexample violating this postcondition,
+		what would generated counterexample look like?
+
+	fold-unfold/negative-enum.rs
+		unregistered verification error, but still produces viper file with counterexample
+		What exactly fails here? Don't know what the counterexample would be.
+	
+	gitlab-issues/issue-74.rs
+	simple-specs/binary-search.rs
+		TODO: Don't know how or why this fails, go over it again! 
+		same function in both files
+
+	unexpected behavior verification:
+	fold-unfold/negative.rs
+		does verify! is this in the wrong folder?
+
+	magic-wands/wrong-wand-identity2.rs
+		- identity2 actually verifies
+		- identity_use3 is a good example to discuss at which program points the
+		  values of variables should be displayed.
+
+examples design decisions:
+
+	magic-wands/wrong-wand-identity2.rs
+		- identity_use3 is a good example to discuss at which program points the
+		  values of variables should be displayed.
+
+	pure-fn/integer-bounds.rs
+		in u32_foo_call_4() should the counterexample display anything? like a temporary variable
+		for the return value? (many other places where this question rises)
+	loops/havock_loop_vars.rs
+		same, the result of random() is very essential to understand a 
+		counterexample so its result should be visible.

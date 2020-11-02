@@ -26,7 +26,8 @@ fn append(a: &mut List, v: i32) {
         });
     }
 }
-
+/* COUNTEREXAMPLE : not supported because 
+    of boxes and infinite enum */
 fn client(a: &mut List, b: &mut List) {
     let old_len = b.len();
     append(a, 100);

@@ -31,3 +31,6 @@ nll-facts/
 /design/book/
 benchmark-output/
 oprofile_data/
+
+
+set_env_vars.sh

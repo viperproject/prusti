@@ -54,7 +54,8 @@ fn append(a: &mut List, v: i32) {
         });
     }
 }
-
+/* COUNTEREXAMPLE : not supported because of boxes and infinite
+    enums */
 #[requires(a.sorted() && a.get(a.len() - 1) <= 111)]
 #[ensures(a.sorted())]
 fn client(a: &mut List, b: &mut List) {
