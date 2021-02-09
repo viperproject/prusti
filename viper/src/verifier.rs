@@ -17,6 +17,8 @@ use verification_backend::VerificationBackend;
 use verification_result::VerificationError;
 use verification_result::VerificationResult;
 use viper_sys::wrappers::viper::*;
+use viper_sys::wrappers::scala;
+use counterexample::Counterexample;
 
 pub mod state {
     pub struct Uninitialized;
@@ -158,7 +160,9 @@ impl<'a> Verifier<'a, state::Started> {
         let is_failure = self
             .jni
             .is_instance_of(viper_result, "viper/silver/verifier/Failure");
-
+        
+        
+        //TODO: understand this and extract counterexample here
         if is_failure {
             let mut errors: Vec<VerificationError> = vec![];
 
@@ -206,6 +210,29 @@ impl<'a> Verifier<'a, state::Started> {
                         self.jni.to_string(viper_error)
                     );
                 };
+
+                let option_original_counterexample = self
+                    .jni
+                    .unwrap_result(verification_error_wrapper.call_counterexample(viper_error));
+                
+                let option_counterexample: Option<Counterexample> = if !self
+                    .jni
+                    .is_instance_of(option_original_counterexample, "scala/None$")
+                {
+                    let original_counterexample = self
+                        .jni
+                        .unwrap_result(scala::Some::with(self.env).call_get(option_original_counterexample));
+                    if self.jni.is_instance_of(original_counterexample, "viper/silicon/interfaces/SiliconMappedCounterexample"){
+                        //only the Mapped Counterexamples are processed
+                        let ce = Counterexample::new(self.env, self.jni, original_counterexample);
+                        Some(ce)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+                
 
                 let reason = self
                     .jni

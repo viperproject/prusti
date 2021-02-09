@@ -32,7 +32,7 @@ impl VerificationError {
         full_id: String,
         pos_id: Option<String>,
         reason_pos_id: Option<String>,
-        message: String,
+        message: String
     ) -> Self {
         VerificationError {
             full_id,

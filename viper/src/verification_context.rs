@@ -70,6 +70,9 @@ impl<'a> VerificationContext<'a> {
         verifier_args.push("--ignoreFile".to_string());
         verifier_args.push("dummy.vpr".to_string());
 
+        verifier_args.push("--counterexample".to_string());
+        verifier_args.push("mapped".to_string());
+        
         debug!(
             "Verifier arguments: '{}'",
             verifier_args.iter().cloned().collect::<Vec<_>>().join(" ")

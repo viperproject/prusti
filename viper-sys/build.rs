@@ -89,6 +89,7 @@ fn main() {
             ]),
             // Scala
             java_class!("scala.Some", vec![
+                method!("get"),
                 constructor!(),
             ]),
             java_class!("scala.None$", vec![
@@ -119,6 +120,15 @@ fn main() {
                 method!("length"),
                 method!("apply", "(I)Ljava/lang/Object;"),
                 method!("toArray"),
+            ]),
+            java_class!("scala.collection.immutable.List", vec![
+                method!("toSeq"),
+            ]),
+            java_class!("scala.collection.Iterable", vec![
+                method!("toSeq"),
+            ]),
+            java_class!("scala.Product", vec![
+                method!("productElement", "(I)Ljava/lang/Object;"),
             ]),
             java_class!("scala.reflect.ClassTag$", vec![
                 object_getter!(),
@@ -603,6 +613,14 @@ fn main() {
                 method!("fullId"),
                 method!("reason"),
                 method!("readableMessage", "()Ljava/lang/String;"),
+                method!("counterexample")
+            ]),
+            java_class!("viper.silver.verifier.Counterexample", vec![
+                method!("model"),
+                method!("toString")
+            ]),
+            java_class!("viper.silicon.interfaces.SiliconMappedCounterexample", vec![
+                method!("converter")
             ]),
             java_class!("viper.silver.verifier.ErrorReason", vec![
                 method!("id"),
@@ -612,6 +630,64 @@ fn main() {
             java_class!("viper.silver.verifier.ConsistencyError", vec![
                 constructor!(),
             ]),
+            java_class!("viper.silicon.reporting.Converter", vec![
+                method!("extractedHeap"),
+                method!("extractedHeaps"),
+                method!("extractedModel"),
+                method!("modelAtLabel"),
+            ]),
+            java_class!("viper.silicon.reporting.ExtractedModel", vec![
+                method!("entries"),
+            ]),
+            java_class!("viper.silicon.reporting.ExtractedModelEntry", vec![
+                method!("toString"),
+            ]),
+            java_class!("viper.silicon.reporting.LitIntEntry", vec![
+                method!("value"),
+            ]),
+            java_class!("viper.silicon.reporting.LitBoolEntry", vec![
+                method!("value"),
+            ]),
+            java_class!("viper.silicon.reporting.LitPermEntry", vec![
+                method!("value"),
+            ]),
+            java_class!("viper.silicon.reporting.RefEntry", vec![
+                method!("name"),
+                method!("fields"),
+            ]),
+            java_class!("viper.silicon.reporting.NullRefEntry", vec![
+                method!("name"),
+            ]),
+            java_class!("viper.silicon.reporting.RecursiveRefEntry", vec![
+                method!("name"),
+            ]),
+            java_class!("viper.silicon.reporting.VarEntry", vec![
+                method!("name"),
+            ]),
+            java_class!("viper.silicon.reporting.OtherEntry", vec![
+                method!("value"),
+                method!("problem"),
+            ]),
+            java_class!("viper.silicon.reporting.SeqEntry", vec![
+                method!("name"),
+                method!("values"),
+            ]),
+            java_class!("viper.silicon.reporting.ExtractedHeap", vec![
+                method!("entries"),
+            ]),
+            java_class!("viper.silicon.reporting.HeapEntry", vec![
+                method!("toString"),
+            ]),
+            java_class!("viper.silicon.reporting.PredHeapEntry", vec![
+                method!("name"),
+                method!("args"),
+            ]),
+            java_class!("viper.silicon.reporting.FieldHeapEntry", vec![
+                method!("recv"),
+                method!("field"),
+                method!("perm"),
+                method!("entry"),
+            ])
         ])
         .generate(&generated_dir)
         .unwrap_or_else(|e| {
