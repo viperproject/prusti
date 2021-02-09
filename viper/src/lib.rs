@@ -28,7 +28,7 @@ mod verification_result;
 mod verifier;
 mod viper;
 mod java_exception;
-mod counterexample;
+pub mod counterexample;
 
 pub use ast_factory::*;
 pub use ast_utils::*;

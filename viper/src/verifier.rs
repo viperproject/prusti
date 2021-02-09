@@ -215,7 +215,7 @@ impl<'a> Verifier<'a, state::Started> {
                     .jni
                     .unwrap_result(verification_error_wrapper.call_counterexample(viper_error));
                 
-                let option_counterexample: Option<Counterexample> = if !self
+                let counterexample: Option<Counterexample> = if !self
                     .jni
                     .is_instance_of(option_original_counterexample, "scala/None$")
                 {
@@ -295,6 +295,7 @@ impl<'a> Verifier<'a, state::Started> {
                     pos_id,
                     reason_pos_id,
                     message,
+                    counterexample,
                 ))
             }
 

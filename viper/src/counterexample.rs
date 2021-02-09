@@ -1,16 +1,20 @@
 use std::collections::HashMap;
+use std::hash::{Hasher, Hash};
+
 use jni::JNIEnv;
 use jni::objects::JObject;
 use jni_utils::JniUtils;
 use viper_sys::wrappers::viper::silicon;
 use viper_sys::wrappers::scala;
 
-
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Counterexample{
-    heap: Heap,
-    old_heaps: HashMap<String, Heap>,
-    model: Model,
-    old_models: HashMap<String, Model>
+    pub heap: Heap,
+    pub old_heaps: HashMap<String, Heap>,
+    pub model: Model,
+    pub old_models: HashMap<String, Model>,
+    hash_helper: String 
+    //this is part of a very ugly way to make this implement Hash and Eq
 }
 
 impl Counterexample{
@@ -23,12 +27,26 @@ impl Counterexample{
     }
 }
 
-//Heap Definitions
-pub struct Heap{
-    entries: Vec<HeapEntry>
+impl PartialEq for Counterexample{
+    fn eq(&self, other: &Self) -> bool{
+        self.hash_helper == other.hash_helper
+    }
+}
+impl Eq for Counterexample{}
+
+impl Hash for Counterexample{
+    fn hash<H:Hasher>(&self, state: &mut H){
+        self.hash_helper.hash(state);
+    }
 }
 
+//Heap Definitions
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Heap{
+    pub entries: Vec<HeapEntry>
+}
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum HeapEntry{
     FieldEntry{
         recv: ModelEntry,
@@ -38,16 +56,17 @@ pub enum HeapEntry{
     },
     PredicateEntry{
         name: String,
-        //args: Vec<ModelEntry> commented out for debugging
+        args: Vec<ModelEntry> 
     }
 }
 
 //Model Definitions
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Model{
-    entries: HashMap<String, ModelEntry>
+    pub entries: HashMap<String, ModelEntry>
 }
 
-
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ModelEntry{
     LitIntEntry(i64),
     LitBoolEntry(bool),
@@ -121,11 +140,13 @@ fn unwrap_counterexample<'a>(
         let old_model = unwrap_model(env, jni, m);
         old_models.insert(label, old_model);
     }
+    let hash_helper = "hashme".to_string();
     Counterexample{
         heap,
         old_heaps,
         model,
-        old_models
+        old_models,
+        hash_helper
     }
 } 
 
@@ -147,7 +168,7 @@ fn unwrap_heap<'a>(env: &'a JNIEnv<'a>, jni: JniUtils<'a>, heap: JObject<'a>) ->
         };
     }
     Heap{
-        entries: vec![]
+        entries 
     }
 }
 
@@ -164,10 +185,25 @@ fn unwrap_heap_entry<'a>(
         //get fields:
         let name_scala = jni.unwrap_result(predicate_entry_wrapper.call_name(entry));
         let name = jni.to_string(name_scala);
-        println!("extracted predicate : {}", name);
+
+        let args_scala = jni
+            .unwrap_result(
+                predicate_entry_wrapper
+                .call_args(entry)
+            );
+        let args_vec = jni.seq_to_vec(args_scala);
+        let mut args = vec![];
+        for el in args_vec{
+            let me = unwrap_model_entry(env, jni, el);
+            match me{
+                Some(e) => args.push(e),
+                None => ()
+            }
+        }
 
         let res = HeapEntry::PredicateEntry{
-            name
+            name,
+            args
         };
         Some(res)
     } else {

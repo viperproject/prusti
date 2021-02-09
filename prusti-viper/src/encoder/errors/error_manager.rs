@@ -9,6 +9,7 @@ use std::collections::HashMap;
 use rustc_span::source_map::SourceMap;
 use rustc_span::MultiSpan;
 use viper::VerificationError;
+use viper::counterexample::*;
 use prusti_interface::PrustiError;
 use log::debug;
 
@@ -154,9 +155,31 @@ impl<'tcx> ErrorManager<'tcx>
         debug!("Register error at: {:?}", pos.id());
         self.error_contexts.insert(pos.id(), error_ctxt);
     }
+    pub fn translate_counterexample(&self, ce_option: Option<&Counterexample>){
+        if let Some(counterexample) = ce_option {
+            let model = &counterexample.model;
+            let heap = &counterexample.heap;
 
+            let old_model = &counterexample.old_models["old"];
+            let old_heap = &counterexample.old_heaps["old"];
+            
+            println!("initial predicates:");
+            for k in &(heap.entries){
+                println!("{:?}", k);
+            }
+            println!("initial entries:");
+            for (k,v) in &(model.entries) {
+                println!("{} <- {:?}", k, v);
+            }
+        } else {
+            println!("no counterexample found");
+        }
+    }
     pub fn translate_verification_error(&self, ver_error: &VerificationError) -> PrustiError {
         debug!("Verification error: {:?}", ver_error);
+
+        self.translate_counterexample(ver_error.counterexample.as_ref());
+
         let opt_pos_id: Option<u64> = match ver_error.pos_id {
             Some(ref viper_pos_id) => {
                 match viper_pos_id.parse() {
