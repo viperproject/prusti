@@ -13,7 +13,7 @@ mod structs;
 
 use jni::objects::JObject;
 use jni::JNIEnv;
-use jni_utils::JniUtils;
+use crate::jni_utils::JniUtils;
 use viper_sys::wrappers::viper::silver::ast;
 
 pub use self::ast_type::*;

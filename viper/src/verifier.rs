@@ -6,16 +6,16 @@
 
 #![cfg_attr(feature = "cargo-clippy", allow(new_ret_no_self))]
 
-use ast_factory::*;
-use ast_utils::AstUtils;
+use crate::ast_factory::*;
+use crate::ast_utils::AstUtils;
 use jni::objects::JObject;
 use jni::JNIEnv;
-use jni_utils::JniUtils;
+use crate::jni_utils::JniUtils;
 use std::marker::PhantomData;
 use std::path::PathBuf;
-use verification_backend::VerificationBackend;
-use verification_result::VerificationError;
-use verification_result::VerificationResult;
+use crate::verification_backend::VerificationBackend;
+use crate::verification_result::VerificationError;
+use crate::verification_result::VerificationResult;
 use viper_sys::wrappers::viper::*;
 
 pub mod state {
