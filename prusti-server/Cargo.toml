@@ -4,6 +4,7 @@ description = "Server-side logic & handling for Prusti"
 name = "prusti-server"
 license = "MPL-2.0"
 version = "0.1.0"
+edition = "2018"
 
 [lib]
 test = true # we have unit tests
