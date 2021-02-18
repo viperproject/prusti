@@ -4,13 +4,13 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use class_name::*;
-use errors::*;
-use generators::constructor::*;
-use generators::method::*;
-use generators::scala_object_getter::*;
+use crate::class_name::*;
+use crate::errors::*;
+use crate::generators::constructor::*;
+use crate::generators::method::*;
+use crate::generators::scala_object_getter::*;
 use jni::JNIEnv;
-use wrapper_spec::*;
+use crate::wrapper_spec::*;
 
 pub struct ClassGenerator<'a> {
     env: &'a JNIEnv<'a>,

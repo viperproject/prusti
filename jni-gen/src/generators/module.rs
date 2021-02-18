@@ -4,8 +4,8 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use class_name::*;
-use module_tree::*;
+use crate::class_name::*;
+use crate::module_tree::*;
 use std::collections::HashMap;
 
 pub fn generate_module(class_names: Vec<&ClassName>) -> String {

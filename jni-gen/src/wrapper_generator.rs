@@ -4,18 +4,18 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use class_name::*;
-use errors::Result as LocalResult;
-use generators::class::ClassGenerator;
-use generators::module::*;
-use jni::InitArgsBuilder;
-use jni::JNIVersion;
-use jni::JavaVM;
+use crate::class_name::*;
+use crate::errors::Result as LocalResult;
+use crate::generators::class::ClassGenerator;
+use crate::generators::module::*;
+use crate::jni::InitArgsBuilder;
+use crate::jni::JNIVersion;
+use crate::jni::JavaVM;
 use std::fs::create_dir_all;
 use std::fs::OpenOptions;
 use std::io::prelude::*;
 use std::path::Path;
-use wrapper_spec::*;
+use crate::wrapper_spec::*;
 
 pub struct WrapperGenerator {
     jars: Vec<String>,

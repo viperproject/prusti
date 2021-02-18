@@ -5,6 +5,7 @@ description = "Generator of Rust bindings to Java classes"
 authors = ["Federico Poli <federpoli@gmail.com>"]
 license = "MPL-2.0"
 readme = "README.md"
+edition = "2018"
 
 [dependencies]
 log = { version = "0.4", features = ["release_max_level_info"] }

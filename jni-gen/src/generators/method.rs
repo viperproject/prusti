@@ -4,13 +4,13 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use class_name::*;
-use errors::*;
-use jni::objects::JObject;
-use jni::objects::JValue;
-use jni::JNIEnv;
+use crate::class_name::*;
+use crate::errors::*;
+use crate::jni::objects::JObject;
+use crate::jni::objects::JValue;
+use crate::jni::JNIEnv;
 use std::collections::HashMap;
-use utils::*;
+use crate::utils::*;
 
 pub fn generate_method(
     env: &JNIEnv,

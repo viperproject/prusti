@@ -4,8 +4,8 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use class_name::*;
-use errors::Result;
+use crate::class_name::*;
+use crate::errors::Result;
 use jni::JNIEnv;
 
 pub fn generate_scala_object_getter(env: &JNIEnv, class_name: &ClassName) -> Result<String> {
