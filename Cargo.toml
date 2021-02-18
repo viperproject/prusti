@@ -16,7 +16,7 @@ members = [
     "viper",
     "viper-sys",
     "jni-gen",
-	"jni-gen/systest",
+    "jni-gen/systest",
 ]
 
 exclude = [

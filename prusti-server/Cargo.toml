@@ -23,10 +23,11 @@ prusti-common = { path = "../prusti-common" }
 env_logger = "0.8.2"
 clap = "2.32.0"
 bincode = "1.0"
-futures = "0.1.24"
-reqwest = "0.9.1"
-warp = "0.1.11"
-tokio = "0.1.11"
+futures = "0.3.12"
+url = "2.2.0"
+reqwest = { version = "0.11.0", features = ["json"] }
+warp = "0.3.0"
+tokio = { version = "1.2.0", features = ["full"] }
 num_cpus = "1.8.0"
 serde = { version = "1.0", features = ["derive"] }
 
