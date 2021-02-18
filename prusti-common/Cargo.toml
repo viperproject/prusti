@@ -2,6 +2,7 @@
 name = "prusti-common"
 version = "0.1.0"
 authors = ["Julian Dunskus <julian.dunskus@gmail.com>"]
+edition = "2018"
 
 [lib]
 doctest = false # we have no doc tests

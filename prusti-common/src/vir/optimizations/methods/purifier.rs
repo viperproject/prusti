@@ -11,7 +11,7 @@
 
 use super::super::super::ast;
 use super::super::super::cfg;
-use config;
+use crate::config;
 use std::collections::{HashMap, HashSet};
 use std::{self, mem};
 

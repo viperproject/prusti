@@ -6,7 +6,7 @@
 
 //! This module defines functions for log messages, meant for developers
 
-use config;
+use crate::config;
 use std::fs;
 use std::io::{self, Write};
 use std::path::PathBuf;

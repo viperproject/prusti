@@ -6,8 +6,8 @@
 
 //! A module that contains various VIR optimizations.
 
-use config::optimizations;
-use vir::{CfgMethod, Program};
+use crate::config::optimizations;
+use crate::vir::{CfgMethod, Program};
 use crate::config::{self, Optimizations};
 
 pub mod folding;

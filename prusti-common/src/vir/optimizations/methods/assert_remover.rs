@@ -6,8 +6,7 @@
 
 //! Optimization that removes unused temporary variables.
 
-use vir::cfg;
-use vir::{Const, Expr, Stmt};
+use crate::vir::{cfg, Const, Expr, Stmt};
 
 /// Remove trivial assertions:
 /// * `assert true`

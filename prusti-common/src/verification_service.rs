@@ -1,6 +1,6 @@
-use config;
+use crate::config;
 use viper::{self, VerificationBackend};
-use vir::Program;
+use crate::vir::Program;
 
 pub trait VerificationService {
     fn verify(&self, request: VerificationRequest) -> viper::VerificationResult;

@@ -4,9 +4,9 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use config;
+use crate::config;
 use std::{fs::create_dir_all, path::PathBuf};
-use verification_service::ViperBackendConfig;
+use crate::verification_service::ViperBackendConfig;
 use viper::{self, AstFactory, VerificationBackend, Viper};
 
 /// A verifier builder is an object that lives entire program's

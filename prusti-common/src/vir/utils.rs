@@ -6,7 +6,7 @@
 
 //! Various utility methods for working with VIR.
 
-use vir::{
+use crate::vir::{
     self, cfg, CfgMethod, ExprFolder, ExprWalker, FallibleStmtFolder, Function, StmtFolder,
     StmtWalker,
 };

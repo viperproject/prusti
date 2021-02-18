@@ -4,9 +4,9 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use config;
+use crate::config;
 use std::io::Write;
-use vir::{self, cfg::method::*};
+use crate::vir::{self, cfg::method::*};
 
 fn escape_html<S: ToString>(s: S) -> String {
     s.to_string()
