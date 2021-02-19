@@ -240,6 +240,10 @@ impl<'v, 'tcx> Encoder<'v, 'tcx> {
         }
     }
 
+    pub fn get_cfg_method(&self, def_id: ProcedureDefId) -> Option<vir::CfgMethod>{
+       self.procedures.borrow_mut().get(&def_id).map(|x| (*x).clone())
+    }
+
     pub(in crate::encoder) fn register_encoding_error(&self, encoding_error: SpannedEncodingError) {
         debug!("Encoding error: {:?}", encoding_error);
         let prusti_error: PrustiError = encoding_error.into();

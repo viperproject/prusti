@@ -37,7 +37,7 @@ pub fn extract_var_debug_info<'tcx>(var_debug_info: &Vec<mir::VarDebugInfo<'tcx>
     for vdi in var_debug_info{
         let original_name = vdi.name.to_ident_string();
         let mir_name = format!("{:?}", vdi.value);
-        map.insert(mir_name, original_name);
+        map.insert(original_name, mir_name);
     }
     map
 }
