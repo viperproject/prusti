@@ -8,7 +8,7 @@ use viper_sys::wrappers::viper::silicon;
 use viper_sys::wrappers::scala;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Counterexample{
+pub struct SiliconCounterexample{
     pub heap: Heap,
     pub old_heaps: HashMap<String, Heap>,
     pub model: Model,
@@ -17,24 +17,24 @@ pub struct Counterexample{
     //this is part of a very ugly way to make this implement Hash and Eq
 }
 
-impl Counterexample{
+impl SiliconCounterexample{
     pub fn new<'a>(
         env: &'a JNIEnv<'a>,
         jni: JniUtils<'a>,
         counterexample: JObject<'a>
-    ) -> Counterexample {
+    ) -> SiliconCounterexample {
         unwrap_counterexample(env, jni, counterexample)
     }
 }
 
-impl PartialEq for Counterexample{
+impl PartialEq for SiliconCounterexample{
     fn eq(&self, other: &Self) -> bool{
         self.hash_helper == other.hash_helper
     }
 }
-impl Eq for Counterexample{}
+impl Eq for SiliconCounterexample{}
 
-impl Hash for Counterexample{
+impl Hash for SiliconCounterexample{
     fn hash<H:Hasher>(&self, state: &mut H){
         self.hash_helper.hash(state);
     }
@@ -86,7 +86,7 @@ fn unwrap_counterexample<'a>(
     env: &'a JNIEnv<'a>, 
     jni: JniUtils<'a>, 
     counterexample: JObject<'a>)
-    -> Counterexample
+    -> SiliconCounterexample
 {
     let converter_wrapper = silicon::reporting::Converter::with(env);
     let ce_wrapper = silicon::interfaces::SiliconMappedCounterexample::with(env);
@@ -141,7 +141,7 @@ fn unwrap_counterexample<'a>(
         old_models.insert(label, old_model);
     }
     let hash_helper = "hashme".to_string();
-    Counterexample{
+    SiliconCounterexample{
         heap,
         old_heaps,
         model,

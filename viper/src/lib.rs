@@ -28,7 +28,7 @@ mod verification_result;
 mod verifier;
 mod viper;
 mod java_exception;
-pub mod counterexample;
+pub mod silicon_counterexample;
 
 pub use ast_factory::*;
 pub use ast_utils::*;
@@ -38,4 +38,4 @@ pub use verification_result::*;
 pub use verifier::*;
 pub use viper::*;
 pub use java_exception::*;
-pub use counterexample::*;
+pub use silicon_counterexample::*;

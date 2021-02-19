@@ -5,7 +5,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use JavaException;
-use counterexample::Counterexample;
+use silicon_counterexample::SiliconCounterexample;
 
 /// The result of a verification request on a Viper program.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -26,7 +26,7 @@ pub struct VerificationError {
     pub pos_id: Option<String>,
     pub reason_pos_id: Option<String>,
     pub message: String,
-    pub counterexample: Option<Counterexample>
+    pub counterexample: Option<SiliconCounterexample>
 }
 
 impl VerificationError {
@@ -35,7 +35,7 @@ impl VerificationError {
         pos_id: Option<String>,
         reason_pos_id: Option<String>,
         message: String,
-        counterexample: Option<Counterexample>
+        counterexample: Option<SiliconCounterexample>
     ) -> Self {
         VerificationError {
             full_id,

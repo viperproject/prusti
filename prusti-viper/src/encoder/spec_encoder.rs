@@ -677,7 +677,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> SpecEncoder<'p, 'v, 'tcx> {
                 .error_manager()
                 .register(
                     self.encoder.env().tcx().def_span(assertion_expr.expr),
-                    ErrorCtxt::GenericExpression),
+                    ErrorCtxt::GenericExpression,
+                    curr_def_id),
         ))
     }
 }

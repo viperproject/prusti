@@ -35,6 +35,8 @@ pub struct CfgMethod {
     fresh_var_index: i32,
     #[serde(skip)]
     fresh_label_index: i32,
+    pub original_names: HashMap<String, String>,
+    pub var_debug_info: HashMap<String, String>
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -140,7 +142,9 @@ impl CfgMethod {
         formal_returns: Vec<LocalVar>,
         local_vars: Vec<LocalVar>,
         reserved_labels: Vec<String>,
+        var_debug_info: HashMap<String, String>
     ) -> Self {
+        println!("var_debug_info: {:?}", var_debug_info);
         CfgMethod {
             uuid: Uuid::new_v4(),
             method_name,
@@ -153,6 +157,8 @@ impl CfgMethod {
             basic_blocks_labels: vec![],
             fresh_var_index: 0,
             fresh_label_index: 0,
+            original_names: HashMap::new(),
+            var_debug_info
         }
     }
 
@@ -224,6 +230,7 @@ impl CfgMethod {
     pub fn add_local_var(&mut self, name: &str, typ: Type) {
         assert!(self.is_fresh_local_name(name));
         self.local_vars.push(LocalVar::new(name, typ));
+        println!("varname: {}", name);
     }
 
     pub fn add_formal_return(&mut self, name: &str, typ: Type) {

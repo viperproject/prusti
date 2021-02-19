@@ -107,6 +107,7 @@ pub trait CfgReplacer<
             cfg.formal_returns.clone(),
             cfg.local_vars.clone(),
             cfg.get_all_labels(),
+            cfg.var_debug_info.clone(),
         );
 
         // Initialize the blocks of the new cfg

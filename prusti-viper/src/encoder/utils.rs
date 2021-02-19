@@ -5,6 +5,10 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 /// Converts a tuple of results into a result containing a tuple.
+use rustc_middle::mir;
+use std::collections::HashMap;
+
+
 pub fn transpose<U, V, E>(tuple: (Result<U, E>, Result<V, E>)) -> Result<(U, V), E> {
     Ok((tuple.0?, tuple.1?))
 }
@@ -26,6 +30,16 @@ pub fn range_extract<T: Ord + Copy + Eq + PartialEq + PlusOne>(mut values: Vec<T
     }
     ranges.push(curr_range);
     ranges
+}
+
+pub fn extract_var_debug_info<'tcx>(var_debug_info: &Vec<mir::VarDebugInfo<'tcx>>) -> HashMap<String,String> {
+    let mut map: HashMap<String, String> = HashMap::new();
+    for vdi in var_debug_info{
+        let original_name = vdi.name.to_ident_string();
+        let mir_name = format!("{:?}", vdi.value);
+        map.insert(mir_name, original_name);
+    }
+    map
 }
 
 // Increment by one

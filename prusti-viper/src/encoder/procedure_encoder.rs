@@ -18,6 +18,7 @@ use crate::encoder::mir_encoder::PRECONDITION_LABEL;
 use crate::encoder::mir_successor::MirSuccessor;
 use crate::encoder::places::{Local, LocalVariableManager, Place};
 use crate::encoder::Encoder;
+use crate::encoder::utils::extract_var_debug_info;
 use prusti_common::{
     config,
     report::log,
@@ -126,6 +127,9 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         let init_info = InitInfo::new(mir, tcx, def_id, &mir_encoder)
             .with_span(procedure.get_span())?;
 
+
+        let var_debug_info = extract_var_debug_info(&mir.var_debug_info); 
+
         let cfg_method = vir::CfgMethod::new(
             // method name
             encoder.encode_item_name(def_id),
@@ -137,6 +141,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             vec![],
             // reserved labels
             vec![],
+            var_debug_info,
         );
 
         Ok(ProcedureEncoder {
@@ -479,7 +484,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         let method_pos = self
             .encoder
             .error_manager()
-            .register(self.mir.span, ErrorCtxt::Unexpected);
+            .register(self.mir.span, ErrorCtxt::Unexpected, self.proc_def_id);
         let method_with_fold_unfold = foldunfold::add_fold_unfold(
             self.encoder,
             self.cfg_method,
@@ -1096,7 +1101,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 // TODO: How to combine this with the span of the encoding error?
                 let span = self.mir_encoder.get_span_of_location(location);
                 let err_ctxt = ErrorCtxt::Unsupported(unsupported_msg.clone());
-                let pos = self.encoder.error_manager().register(span, err_ctxt);
+                let pos = self.encoder.error_manager().register(span, err_ctxt, self.proc_def_id);
                 let head_stmt = if index < bb_data.statements.len() {
                     format!("[mir] {:?}", &bb_data.statements[index])
                 } else {
@@ -1176,11 +1181,11 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         let expr_pos = self
             .encoder
             .error_manager()
-            .register(default_pos_span, ErrorCtxt::GenericExpression);
+            .register(default_pos_span, ErrorCtxt::GenericExpression, self.proc_def_id);
         let stmt_pos = self
             .encoder
             .error_manager()
-            .register(default_pos_span, ErrorCtxt::GenericStatement);
+            .register(default_pos_span, ErrorCtxt::GenericStatement, self.proc_def_id);
 
         stmts
             .into_iter()
@@ -1455,7 +1460,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             let pos = self
                 .encoder
                 .error_manager()
-                .register(self.mir.source_info(location).span, ErrorCtxt::Unexpected);
+                .register(self.mir.source_info(location).span, ErrorCtxt::Unexpected, self.proc_def_id);
             stmts.push(vir::Stmt::Assert(
                 vir::Expr::eq_cmp(lhs.clone().into(), rhs.into()),
                 pos,
@@ -1475,6 +1480,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 // TODO: use a better span
                 self.mir.span,
                 ErrorCtxt::Unexpected,
+                self.proc_def_id,
             );
             stmts.push(vir::Stmt::Assert(expr, pos));
         }
@@ -1746,6 +1752,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             // TODO change to where the loan expires?
             self.mir.source_info(loan_location).span, // the source of the ref
             ErrorCtxt::ApplyMagicWandOnExpiry,
+            self.proc_def_id,
         );
         // Inhale the magic wand.
         let magic_wand = vir::Expr::MagicWand(
@@ -1979,7 +1986,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 let pos = self
                     .encoder
                     .error_manager()
-                    .register(term.source_info.span, ErrorCtxt::AbortTerminator);
+                    .register(term.source_info.span, ErrorCtxt::AbortTerminator, self.proc_def_id);
                 stmts.push(vir::Stmt::Assert(
                     false.into(),
                     pos,
@@ -2080,7 +2087,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                                 .error_manager()
                                 .register(
                                     term.source_info.span,
-                                    ErrorCtxt::Panic(panic_cause)
+                                    ErrorCtxt::Panic(panic_cause),
+                                    self.proc_def_id,
                                 );
 
                             if self.check_panics {
@@ -2320,6 +2328,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                         self.encoder.error_manager().register(
                             term.source_info.span,
                             error_ctxt,
+                            self.proc_def_id,
                         ),
                     ));
                 } else {
@@ -2718,7 +2727,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         let pos = self
             .encoder
             .error_manager()
-            .register(call_site_span, ErrorCtxt::ExhaleMethodPrecondition);
+            .register(call_site_span, ErrorCtxt::ExhaleMethodPrecondition, self.proc_def_id);
         stmts.push(vir::Stmt::Assert(
             replace_fake_exprs(pre_func_spec),
             pos,
@@ -2890,7 +2899,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         let pos = self
             .encoder
             .error_manager()
-            .register(call_site_span, ErrorCtxt::PureFunctionCall);
+            .register(call_site_span, ErrorCtxt::PureFunctionCall, self.proc_def_id);
 
         let func_call = vir::Expr::func_app(
             function_name.clone(),
@@ -3178,6 +3187,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 false,
                 None,
                 ErrorCtxt::GenericExpression,
+                self.proc_def_id
             )?;
             func_spec.push(value);
         }
@@ -3219,6 +3229,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 ErrorCtxt::AssertMethodPreconditionWeakening(
                     precondition_spans.clone()
                 ),
+                self.proc_def_id
             )
         }).map_or(Ok(None), |v| v.map(Some))?;
         Ok((
@@ -3356,6 +3367,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                         false,
                         None,
                         ErrorCtxt::GenericExpression,
+                        self.proc_def_id
                     )?
                 } else {
                     true.into()
@@ -3369,6 +3381,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                     false,
                     None,
                     ErrorCtxt::GenericExpression,
+                    self.proc_def_id
                 )?;
                 assertion_lhs = self.wrap_arguments_into_old(
                     assertion_lhs,
@@ -3580,6 +3593,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 false,
                 None,
                 ErrorCtxt::GenericExpression,
+                self.proc_def_id
             )?;
             func_spec_spans.extend(typed::Spanned::get_spans(typed_assertion, &self.mir, self.encoder.env().tcx()));
             assertion = self.wrap_arguments_into_old(
@@ -3616,6 +3630,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                     ErrorCtxt::AssertMethodPostconditionStrengthening(
                         postcondition_span.clone()
                     ),
+                    self.proc_def_id
                 )
             )
             .map_or(Ok(None), |r| r.map(Some))
@@ -3729,7 +3744,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             let pos = self
                 .encoder
                 .error_manager()
-                .register(self.mir.span, ErrorCtxt::PackageMagicWandForPostcondition);
+                .register(self.mir.span, ErrorCtxt::PackageMagicWandForPostcondition, self.proc_def_id);
 
             let blocker = mir::RETURN_PLACE;
             // TODO: Check if it really is always start and not the mid point.
@@ -3875,6 +3890,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         let type_inv_pos = self.encoder.error_manager().register(
             self.mir.span,
             ErrorCtxt::AssertMethodPostconditionTypeInvariants,
+            self.proc_def_id,
         );
 
         // Find which arguments are blocked by the returned reference.
@@ -4014,7 +4030,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         let func_pos = self
             .encoder
             .error_manager()
-            .register(self.mir.span, ErrorCtxt::AssertMethodPostcondition);
+            .register(self.mir.span, ErrorCtxt::AssertMethodPostcondition, self.proc_def_id);
         let patched_func_spec = self.replace_old_places_with_ghost_vars(None, func_spec);
         self.cfg_method.add_stmt(
             return_cfg_block,
@@ -4040,7 +4056,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         let perm_pos = self
             .encoder
             .error_manager()
-            .register(self.mir.span, ErrorCtxt::ExhaleMethodPostcondition);
+            .register(self.mir.span, ErrorCtxt::ExhaleMethodPostcondition, self.proc_def_id);
         let patched_type_spec = self.replace_old_places_with_ghost_vars(None, type_spec);
         debug_assert!(!perm_pos.is_default());
         self.cfg_method.add_stmt(
@@ -4433,6 +4449,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                     false,
                     Some(loop_inv_block),
                     ErrorCtxt::GenericExpression,
+                    self.proc_def_id
                 )?;
                 let spec_spans = typed::Spanned::get_spans(assertion, &self.mir, self.encoder.env().tcx());
                 let spec_pos = self
@@ -4481,6 +4498,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             } else {
                 ErrorCtxt::AssertLoopInvariantOnEntry
             },
+            self.proc_def_id,
         );
 
         let exhale_pos = self.encoder.error_manager().register(
@@ -4491,6 +4509,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             } else {
                 ErrorCtxt::ExhaleLoopInvariantOnEntry
             },
+            self.proc_def_id,
         );
 
         let mut stmts = vec![vir::Stmt::comment(format!(

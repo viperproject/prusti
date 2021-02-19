@@ -793,6 +793,7 @@ impl<'v, 'tcx> Encoder<'v, 'tcx> {
         targets_are_values: bool,
         assertion_location: Option<mir::BasicBlock>,
         error: ErrorCtxt,
+        def_id: ProcedureDefId,
     ) -> SpannedEncodingResult<vir::Expr> {
         trace!("encode_assertion {:?}", assertion);
         let encoded_assertion = encode_spec_assertion(
@@ -806,7 +807,7 @@ impl<'v, 'tcx> Encoder<'v, 'tcx> {
         )?;
         Ok(encoded_assertion.set_default_pos(
             self.error_manager()
-                .register(typed::Spanned::get_spans(assertion, mir, self.env().tcx()), error),
+                .register(typed::Spanned::get_spans(assertion, mir, self.env().tcx()), error, def_id)
         ))
     }
 
