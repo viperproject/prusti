@@ -25,6 +25,38 @@ impl SiliconCounterexample{
     ) -> SiliconCounterexample {
         unwrap_counterexample(env, jni, counterexample)
     }
+
+    pub fn get_entry_at_label(&self, name: &String, label: Option<&String>) -> Option<&ModelEntry>{
+        match label{
+            Some(s) => {
+                let model = self.old_models.get(s);
+                match model{
+                    Some(m) => m.entries.get(name),
+                    None => None
+                }
+            },
+            None => {
+                self.model.entries.get(name)
+            }
+        }
+    }
+
+    pub fn get_last_label(&self) -> Option<&String>{
+        //look for the highest l* label
+        let mut max = -1;
+        let mut lbl = None;
+        for label in self.old_models.keys() {
+            let maybe_number = label[1..].to_string();
+            let index = maybe_number.parse::<i32>();
+            if let Ok(i) = index{
+                if i > max {
+                    max = i;
+                    lbl = Some(label);
+                }
+            }
+        }
+        lbl
+    }
 }
 
 impl PartialEq for SiliconCounterexample{

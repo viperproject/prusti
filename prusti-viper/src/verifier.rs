@@ -9,7 +9,7 @@ use prusti_common::{
     config, report::log, verification_context::VerifierBuilder, verification_service::*, Stopwatch,
 };
 use crate::encoder::Encoder;
-use crate::counterexample;
+use crate::encoder::counterexample;
 // use prusti_filter::validators::Validator;
 use prusti_interface::data::VerificationResult;
 use prusti_interface::data::VerificationTask;
@@ -329,15 +329,8 @@ impl<'v, 'tcx> Verifier<'v, 'tcx> {
                     Some(id) => {
                         //for now we assume we deal with non pure functions => should have a cfg_method
                         let def_id = *id;
-                        let cfg_method : Option<CfgMethod> = self.encoder.get_cfg_method(def_id);
-                        let silicon_counterexample = verification_error.counterexample.map(|x| x.clone());
-                        match cfg_method{
-                            Some(cfg) => {
-                                let counterexample = counterexample::backtranslate(def_id, cfg, silicon_counterexample);
-                            },
-                            None => (),
-                        }
-                        
+                        let silicon_counterexample = verification_error.counterexample;
+                        let counterexample = self.encoder.get_counterexample(def_id, silicon_counterexample);
                     },
                     None => (),
                 }

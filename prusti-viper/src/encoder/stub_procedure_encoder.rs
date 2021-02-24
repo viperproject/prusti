@@ -6,7 +6,6 @@
 
 use crate::encoder::mir_encoder::{MirEncoder, PlaceEncoder};
 use crate::encoder::Encoder;
-use crate::encoder::utils::extract_var_debug_info;
 use prusti_common::vir;
 use prusti_common::vir::Successor;
 use prusti_common::config;
@@ -44,7 +43,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> StubProcedureEncoder<'p, 'v, 'tcx> {
     pub fn encode(self) -> vir::CfgMethod {
         trace!("Encode stub for procedure {}", self.procedure.get_def_path());
 
-        let var_debug_info = extract_var_debug_info(&self.mir.var_debug_info);
         let mut cfg_method = vir::CfgMethod::new(
             // method name
             self.encoder.encode_item_name(self.def_id),
@@ -56,7 +54,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> StubProcedureEncoder<'p, 'v, 'tcx> {
             vec![],
             // reserved labels
             vec![],
-            var_debug_info,
         );
 
         // Declare the formal return

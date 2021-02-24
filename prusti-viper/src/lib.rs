@@ -29,4 +29,3 @@ extern crate lazy_static;
 pub mod encoder;
 mod utils;
 pub mod verifier;
-pub mod counterexample;

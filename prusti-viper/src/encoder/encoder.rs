@@ -59,6 +59,9 @@ use crate::encoder::mirror_function_encoder::MirrorEncoder;
 use crate::encoder::snapshot::encoder::SnapshotEncoder;
 use crate::encoder::purifier;
 use crate::encoder::array_encoder::{ArrayTypesEncoder, EncodedArrayTypes, EncodedSliceTypes};
+use crate::encoder::counterexample::*;
+use viper::SiliconCounterexample;
+use crate::encoder::places::LocalVariableManager;
 
 #[must_use]
 pub struct CleanupTyMapStack<'a, 'tcx> {
@@ -238,10 +241,6 @@ impl<'v, 'tcx> Encoder<'v, 'tcx> {
             functions: self.get_used_viper_functions(),
             viper_predicates: self.get_used_viper_predicates(),
         }
-    }
-
-    pub fn get_cfg_method(&self, def_id: ProcedureDefId) -> Option<vir::CfgMethod>{
-       self.procedures.borrow_mut().get(&def_id).map(|x| (*x).clone())
     }
 
     pub(in crate::encoder) fn register_encoding_error(&self, encoding_error: SpannedEncodingError) {
@@ -1434,6 +1433,34 @@ impl<'v, 'tcx> Encoder<'v, 'tcx> {
         self.array_types_encoder
             .borrow_mut()
             .encode_slice_types(self, slice_ty)
+    }
+
+    pub fn get_cfg_method(&self, def_id: ProcedureDefId) -> Option<vir::CfgMethod> {
+       self.procedures.borrow_mut().get(&def_id).map(|x| (*x).clone())
+    }
+
+    pub fn get_counterexample(
+        &self, 
+        def_id: ProcedureDefId,
+        silicon_counterexample: Option<SiliconCounterexample>,
+    ) -> Counterexample {
+        let procedure = self.env.get_procedure(def_id);
+        let methods = self.procedures.borrow();
+        let cfg_method_opt = methods.get(&def_id);
+        if let Some(cfg) = cfg_method_opt{
+            println!("return label {:?}", cfg.get_return_label());
+        }
+        let mir = procedure.get_mir();
+        let tyctxt = &self.env.tcx();
+        let is_pure = self.is_pure(def_id);
+        /*
+        let var_debug_info = mir.var_debug_info.clone();
+        let locals = mir.local_decls.clone();
+        let arg_count = mir.arg_count;
+        let local_manager = LocalVariableManager::new(&locals); 
+        */
+
+        backtranslate(silicon_counterexample, mir, is_pure, tyctxt)
     }
 }
 

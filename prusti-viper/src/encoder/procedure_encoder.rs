@@ -18,7 +18,6 @@ use crate::encoder::mir_encoder::PRECONDITION_LABEL;
 use crate::encoder::mir_successor::MirSuccessor;
 use crate::encoder::places::{Local, LocalVariableManager, Place};
 use crate::encoder::Encoder;
-use crate::encoder::utils::extract_var_debug_info;
 use prusti_common::{
     config,
     report::log,
@@ -127,9 +126,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         let init_info = InitInfo::new(mir, tcx, def_id, &mir_encoder)
             .with_span(procedure.get_span())?;
 
-
-        let var_debug_info = extract_var_debug_info(&mir.var_debug_info); 
-
         let cfg_method = vir::CfgMethod::new(
             // method name
             encoder.encode_item_name(def_id),
@@ -141,7 +137,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             vec![],
             // reserved labels
             vec![],
-            var_debug_info,
         );
 
         Ok(ProcedureEncoder {
