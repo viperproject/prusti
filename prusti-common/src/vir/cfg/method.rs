@@ -450,16 +450,6 @@ impl CfgMethod {
         }
         None
     }
-
-    pub fn get_return_label(&self) -> Option<String> {
-        let length = self.basic_blocks.len();
-        for i in 0..length{
-            if self.basic_blocks[i].successor.is_return(){
-                return Some(self.basic_blocks_labels[i].clone())
-            }
-        }
-        None
-    }
 }
 
 impl WithIdentifier for CfgMethod {

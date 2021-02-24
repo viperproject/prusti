@@ -173,7 +173,6 @@ impl<'tcx> ErrorManager<'tcx>
 
     pub fn translate_verification_error(&self, ver_error: &VerificationError) -> PrustiError {
         debug!("Verification error: {:?}", ver_error);
-
         let opt_pos_id: Option<u64> = match ver_error.pos_id {
             Some(ref viper_pos_id) => {
                 match viper_pos_id.parse() {

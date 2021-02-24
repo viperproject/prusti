@@ -128,7 +128,6 @@ fn backtranslate_entry<'tcx>(typ: Ty<'tcx>, sil_entry: Option<&ModelEntry>, tcx:
     match sil_entry {
         None => Entry::UnknownEntry,
         Some(entry) => {
-            println!("Translating entry: {:?}", entry);
             match typ.kind(){
                 ty::TyKind::Bool => {
                     match entry{

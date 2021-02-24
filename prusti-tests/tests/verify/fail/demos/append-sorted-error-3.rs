@@ -40,8 +40,6 @@ impl List {
     }
 }
 
-/* COUNTEREXAMPLE : not supported because of boxes and infinite
-    enums */
 #[requires(a.sorted() && a.get(a.len() - 1) <= v)]
 #[ensures(a.len() == old(a.len()) + 1)]
 // #[ensures(a.get(0) == old(a.get(0)))] // missing

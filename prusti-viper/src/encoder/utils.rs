@@ -5,8 +5,6 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 /// Converts a tuple of results into a result containing a tuple.
-
-
 pub fn transpose<U, V, E>(tuple: (Result<U, E>, Result<V, E>)) -> Result<(U, V), E> {
     Ok((tuple.0?, tuple.1?))
 }

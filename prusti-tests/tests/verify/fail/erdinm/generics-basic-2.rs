@@ -14,10 +14,6 @@ fn read<U>(u: &U) -> i32 {
 fn write<U>(u: &mut U) {
 }
 
-/* TODO : what does trusted mean? why does assert!(valid(u)) fail if
-          it always returns true.
-   COUNTEREXAMPLE : 
-*/
 #[requires(valid(u))]
 fn test<U>(u: &mut U) {
     assert!(valid(u));

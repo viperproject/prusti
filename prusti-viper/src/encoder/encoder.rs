@@ -1435,21 +1435,12 @@ impl<'v, 'tcx> Encoder<'v, 'tcx> {
             .encode_slice_types(self, slice_ty)
     }
 
-    pub fn get_cfg_method(&self, def_id: ProcedureDefId) -> Option<vir::CfgMethod> {
-       self.procedures.borrow_mut().get(&def_id).map(|x| (*x).clone())
-    }
-
     pub fn get_counterexample(
         &self, 
         def_id: ProcedureDefId,
         silicon_counterexample: Option<SiliconCounterexample>,
     ) -> Counterexample {
         let procedure = self.env.get_procedure(def_id);
-        let methods = self.procedures.borrow();
-        let cfg_method_opt = methods.get(&def_id);
-        if let Some(cfg) = cfg_method_opt{
-            println!("return label {:?}", cfg.get_return_label());
-        }
         let mir = procedure.get_mir();
         let tyctxt = &self.env.tcx();
         let is_pure = self.is_pure(def_id);
