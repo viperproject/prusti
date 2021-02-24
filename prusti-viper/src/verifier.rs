@@ -331,6 +331,7 @@ impl<'v, 'tcx> Verifier<'v, 'tcx> {
                         let def_id = *id;
                         let silicon_counterexample = verification_error.counterexample;
                         let counterexample = self.encoder.get_counterexample(def_id, silicon_counterexample);
+                        counterexample.emit();
                     },
                     None => (),
                 }

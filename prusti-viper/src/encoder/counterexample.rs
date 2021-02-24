@@ -6,6 +6,7 @@ use crate::encoder::Encoder;
 use viper::VerificationError;
 use crate::encoder::places::{Local, LocalVariableManager, Place};
 use std::convert::TryFrom;
+use std::fmt;
 
 use rustc_middle::mir;
 use rustc_middle::ty::{self, Ty, AdtKind, AdtDef, TyCtxt};
@@ -20,6 +21,28 @@ pub enum Counterexample {
     },
     Failure(String),
 }
+
+impl Counterexample{
+    pub fn emit(&self) {
+        match self{
+            Counterexample::Success{result, args, entries} => {
+                println!("initial args:");
+                for (name, entry) in args {
+                    println!("{} <- {}", name, entry);
+                }
+                println!("\nlocal values when failing:");
+                for (name, entry) in entries {
+                    println!("{} <- {}", name, entry);
+                }
+                println!("\nresult <- {}", result)
+            },
+            _ => ()
+        }
+    }
+}
+
+
+
 #[derive(Debug)]
 pub enum Entry{
     IntEntry{value: i64},
@@ -39,6 +62,26 @@ pub enum Entry{
     },
     UnknownEntry
 }
+
+impl fmt::Display for Entry{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self{
+            Entry::IntEntry { value } => write!(f, "{}", value),
+            Entry::BoolEntry { value } => write!(f, "{}", value),
+            Entry::CharEntry { value } => write!(f, "{}", value),
+            Entry::RefEntry { el } => write!(f, "ref( {})", *el),
+            Entry::Struct { name, fields} => {
+                write!(f, "{} {{", name);
+                for (name, entry) in fields {
+                    write!(f, "\n\t{} <- {}", name, entry);
+                }
+                write!(f, "\n}}\n")
+            }
+            _ => write!(f, "testing")
+        }
+    }
+}
+
 
 pub fn backtranslate<'tcx>(
     silicon_counterexample: Option<SiliconCounterexample>,
@@ -81,6 +124,7 @@ pub fn backtranslate<'tcx>(
 
             if index > 0 && index <= arg_count {
                 let opt_entry = silicon_ce.get_entry_at_label(&vir_name, Some(&String::from("l0")));
+                println!("Silicon arg entry: {:?}", opt_entry);
                 let arg_entry = backtranslate_entry(typ, opt_entry, tcx);
                 args.insert(rust_name, arg_entry);
             }
@@ -106,9 +150,10 @@ pub fn backtranslate<'tcx>(
         println!("arguments: {:?}", args);
         println!("final entries: {:?}", entries);
         println!("result <- {:?}", result);
+        Counterexample::Success{ result, args, entries}
+    } else {
+        Counterexample::Failure(String::from("there"))
     }
-    Counterexample::Failure(String::from("there"))
-
     /*
     match silicon_counterexample{
         None => Counterexample::Failure(String::from("Silicon-counterexample not available")),
