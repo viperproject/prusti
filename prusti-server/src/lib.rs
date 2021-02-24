@@ -21,7 +21,7 @@ mod service;
 mod verifier_runner;
 mod verifier_thread;
 
-use futures::Future;
+use futures::executor::block_on;
 use prusti_common::{verification_context::VerifierBuilder, verification_service::*, Stopwatch};
 pub use service::*;
 use std::{
@@ -73,10 +73,8 @@ impl PrustiServer {
             )
         });
 
-        match thread
-            .verify(request.program, request.program_name.clone())
-            .wait()
-        {
+        let task = thread.verify(request.program, request.program_name.clone());
+        match block_on(task) {
             Ok(result) => {
                 // put back the thread for later reuse
                 let mut threads = self.threads.write().unwrap();

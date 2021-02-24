@@ -8,9 +8,10 @@ use super::{PrustiServer, RemoteVerificationResult};
 use prusti_common::{config, verification_service::*};
 
 use bincode;
-use futures::{self};
 use num_cpus;
-use reqwest::{self, Client, Url, UrlError};
+use futures::executor::block_on;
+use url::{Url, ParseError};
+use reqwest::{self, Client};
 use std::{
     net::{Ipv4Addr, SocketAddr},
     sync::{mpsc, Arc},
@@ -18,13 +19,17 @@ use std::{
 };
 use tokio;
 use viper::VerificationResult;
-use warp::{self, Buf, Filter};
+use warp::{self, Filter};
 
 #[derive(Clone)]
 pub struct ServerSideService {
     server: Arc<PrustiServer>,
     max_concurrency: usize,
 }
+
+#[derive(Debug)]
+struct BincodeReject(bincode::Error);
+impl warp::reject::Reject for BincodeReject {}
 
 impl ServerSideService {
     pub fn new() -> Self {
@@ -85,11 +90,11 @@ impl ServerSideService {
         let bincode_verify = warp::path("bincode")
             .and(warp::path("verify"))
             .and(warp::path::end())
-            .and(warp::body::concat())
-            .and_then(|buf: warp::body::FullBody| {
-                bincode::deserialize(&buf.bytes()).map_err(|err| {
+            .and(warp::body::bytes())
+            .and_then(|buf: warp::hyper::body::Bytes| async move {
+                bincode::deserialize(&buf).map_err(|err| {
                     info!("request bincode body error: {}", err);
-                    warp::reject::custom(err)
+                    warp::reject::custom(BincodeReject(err))
                 })
             })
             .map(move |request: VerificationRequest| clone.verify(request))
@@ -107,18 +112,17 @@ impl ServerSideService {
         address_callback(address);
 
         info!("Prusti Server starting on port {}", address.port());
-        let mut runtime = tokio::runtime::Builder::new()
-            .name_prefix("prusti-server-")
-            .core_threads(self.max_concurrency)
+        let runtime = tokio::runtime::Builder::new_multi_thread()
+            .thread_name("prusti-server")
+            .worker_threads(self.max_concurrency)
             .build()
             .expect("could not construct Tokio runtime!");
 
-        runtime.spawn(futures::lazy(move || {
-            warp::spawn(server_handle);
+        runtime.spawn(async move {
             info!("Prusti Server launched!");
             println!("port: {}", address.port()); // stdout, for use in other applications
-            Ok(())
-        }));
+            server_handle.await;
+        });
 
         thread::park();
     }
@@ -135,13 +139,13 @@ pub struct PrustiServerConnection {
 }
 
 impl PrustiServerConnection {
-    pub fn new<S: ToString>(server_address: S) -> Result<Self, UrlError> {
+    pub fn new<S: ToString>(server_address: S) -> Result<Self, ParseError> {
         let mut address = server_address.to_string();
         if !address.starts_with("http") {
             address = format!("http://{}", address);
         }
         Ok(Self {
-            client: Client::builder().timeout(None).build().unwrap(),
+            client: Client::builder().build().unwrap(),
             server_url: Url::parse(address.as_str())?,
         })
     }
@@ -159,13 +163,16 @@ impl PrustiServerConnection {
                 .unwrap(),
         );
         let response = if use_json {
-            base.json(&request).send()?.error_for_status()?.json()?
+            let request = base.json(&request).send();
+            let response = block_on(request)?.error_for_status()?.json();
+            block_on(response)?
         } else {
-            let raw = base
+            let request = base
                 .body(bincode::serialize(&request).expect("error encoding verification request"))
-                .send()?
-                .error_for_status()?;
-            bincode::deserialize_from(raw).expect("error decoding verification result")
+                .send();
+            let response = block_on(request)?.error_for_status()?.bytes();
+            let bytes = block_on(response)?;
+            bincode::deserialize(&bytes).expect("error decoding verification result")
         };
         Ok(response)
     }

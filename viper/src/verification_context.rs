@@ -4,14 +4,14 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use ast_factory::*;
-use ast_utils::*;
+use crate::ast_factory::*;
+use crate::ast_utils::*;
 use jni::AttachGuard;
 use std::env;
 use std::path::{Path, PathBuf};
-use verification_backend::VerificationBackend;
-use verifier::state;
-use verifier::Verifier;
+use crate::verification_backend::VerificationBackend;
+use crate::verifier::state;
+use crate::verifier::Verifier;
 
 pub struct VerificationContext<'a> {
     env: AttachGuard<'a>,

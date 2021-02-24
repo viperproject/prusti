@@ -4,10 +4,10 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use config;
+use crate::config;
 use std::collections::HashMap;
 use viper::{self, AstFactory};
-use vir::{
+use crate::vir::{
     ast::Position,
     cfg::method::*,
     to_viper::{ToViper, ToViperDecl},

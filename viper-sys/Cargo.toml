@@ -6,6 +6,7 @@ authors = ["Federico Poli <federpoli@gmail.com>"]
 license = "MPL-2.0"
 readme = "README.md"
 build = "build.rs"
+edition = "2018"
 
 [build-dependencies]
 jni-gen = { path = "../jni-gen" }

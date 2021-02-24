@@ -2,20 +2,20 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use ast_factory::structs::Domain;
-use ast_factory::structs::NamedDomainAxiom;
-use ast_factory::structs::DomainFunc;
-use ast_factory::structs::Expr;
-use ast_factory::structs::Field;
-use ast_factory::structs::Function;
-use ast_factory::structs::LocalVarDecl;
-use ast_factory::structs::Method;
-use ast_factory::structs::Position;
-use ast_factory::structs::Predicate;
-use ast_factory::structs::Program;
-use ast_factory::structs::Stmt;
-use ast_factory::structs::Type;
-use ast_factory::AstFactory;
+use crate::ast_factory::structs::Domain;
+use crate::ast_factory::structs::NamedDomainAxiom;
+use crate::ast_factory::structs::DomainFunc;
+use crate::ast_factory::structs::Expr;
+use crate::ast_factory::structs::Field;
+use crate::ast_factory::structs::Function;
+use crate::ast_factory::structs::LocalVarDecl;
+use crate::ast_factory::structs::Method;
+use crate::ast_factory::structs::Position;
+use crate::ast_factory::structs::Predicate;
+use crate::ast_factory::structs::Program;
+use crate::ast_factory::structs::Stmt;
+use crate::ast_factory::structs::Type;
+use crate::ast_factory::AstFactory;
 use jni::objects::JObject;
 use viper_sys::wrappers::viper::silver::ast;
 

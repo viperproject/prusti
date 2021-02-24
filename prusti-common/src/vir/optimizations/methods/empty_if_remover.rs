@@ -8,8 +8,7 @@
 
 use std::slice;
 
-use vir::cfg;
-use vir::Stmt;
+use crate::vir::{cfg, Stmt};
 
 /// Remove empty if statements:
 /// * `if (...) {}`

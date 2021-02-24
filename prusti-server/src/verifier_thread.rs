@@ -5,7 +5,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use super::VerifierRunner;
-use futures::{sync::oneshot, Canceled, Future};
+use futures::channel::oneshot;
 use prusti_common::{
     verification_context::VerifierBuilder, verification_service::ViperBackendConfig, vir::Program,
 };
@@ -15,7 +15,7 @@ use std::{
 };
 use viper::VerificationResult;
 
-pub type FutVerificationResult = Box<dyn Future<Item = VerificationResult, Error = Canceled>>;
+pub type FutVerificationResult = futures::channel::oneshot::Receiver<VerificationResult>;
 
 struct VerificationRequest {
     pub program: Program,
@@ -78,6 +78,6 @@ impl VerifierThread {
                 sender: tx,
             })
             .unwrap();
-        Box::new(rx)
+        rx
     }
 }

@@ -4,7 +4,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use error_chain::ChainedError;
+use crate::error_chain::ChainedError;
 use jni::errors::{Result as JniResult, ErrorKind};
 use jni::objects::JObject;
 use jni::objects::JString;
@@ -12,7 +12,7 @@ use jni::strings::JNIString;
 use jni::sys::jsize;
 use jni::JNIEnv;
 use viper_sys::wrappers::*;
-use java_exception::JavaException;
+use crate::java_exception::JavaException;
 
 #[derive(Clone, Copy)]
 pub struct JniUtils<'a> {

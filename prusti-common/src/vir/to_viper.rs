@@ -4,9 +4,9 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use config;
+use crate::config;
 use viper::{self, AstFactory};
-use vir::{ast::*, borrows::borrow_id, Program};
+use crate::vir::{ast::*, borrows::borrow_id, Program};
 
 pub trait ToViper<'v, T> {
     fn to_viper(&self, ast: &AstFactory<'v>) -> T;

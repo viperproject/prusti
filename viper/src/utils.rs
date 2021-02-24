@@ -6,7 +6,7 @@
 
 //! Various utility methods for working with Viper.
 
-use ast_factory::{AstFactory, Expr};
+use crate::ast_factory::{AstFactory, Expr};
 
 pub trait ExprIterator<'v> {
     /// Conjoin a sequence of expressions into a single expression.

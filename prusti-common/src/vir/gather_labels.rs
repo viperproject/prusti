@@ -1,5 +1,4 @@
-use vir::StmtWalker;
-use vir::ast;
+use crate::vir::{StmtWalker, ast};
 
 pub(super) fn gather_labels(stmt: &ast::Stmt) -> Vec<String> {
     let mut gather_labels = GatherLabels::default();
