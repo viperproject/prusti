@@ -168,6 +168,22 @@ impl<'a> JniUtils<'a> {
         res_map
     }
 
+    pub fn stringmap_to_keyvec(&self, map: JObject<'a>) -> Vec<String> {
+        let iter_wrapper = scala::collection::Iterable::with(self.env);
+        let product_wrapper = scala::Product::with(self.env);
+
+        let mut res_vec = vec![];
+        let seq = self.unwrap_result(iter_wrapper.call_toSeq(map));
+        let vector = self.seq_to_vec(seq);
+        let length = vector.len();
+        for i in 0..length {
+            let item = self.unwrap_result(product_wrapper.call_productElement(vector[i], 0));
+            let string = self.to_string(item);
+            res_vec.push(string);
+        }
+        res_vec
+    }
+
     /// Checks if an object is a subtype of a Java class
     pub fn is_instance_of(&self, object: JObject, class: &str) -> bool {
         let object_class = self.unwrap_result(self.env.get_object_class(object));

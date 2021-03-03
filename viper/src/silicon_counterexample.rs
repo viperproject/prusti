@@ -13,6 +13,8 @@ pub struct SiliconCounterexample{
     pub old_heaps: HashMap<String, Heap>,
     pub model: Model,
     pub old_models: HashMap<String, Model>,
+    //label_order because HashMap's do not guarantee order of elements
+    pub label_order: Vec<String>,
     hash_helper: String 
     //this is part of a very ugly way to make this implement Hash and Eq
 }
@@ -39,23 +41,6 @@ impl SiliconCounterexample{
                 self.model.entries.get(name)
             }
         }
-    }
-
-    pub fn get_last_label(&self) -> Option<&String>{
-        //look for the highest l* label
-        let mut max = -1;
-        let mut lbl = None;
-        for label in self.old_models.keys() {
-            let maybe_number = label[1..].to_string();
-            let index = maybe_number.parse::<i32>();
-            if let Ok(i) = index{
-                if i > max {
-                    max = i;
-                    lbl = Some(label);
-                }
-            }
-        }
-        lbl
     }
 }
 
@@ -151,6 +136,8 @@ fn unwrap_counterexample<'a>(
         old_heaps.insert(label, old_heap);
     }
 
+    let label_order = jni.stringmap_to_keyvec(old_heaps_scala);
+
 
  
     let model_scala = jni
@@ -178,6 +165,7 @@ fn unwrap_counterexample<'a>(
         old_heaps,
         model,
         old_models,
+        label_order,
         hash_helper
     }
 } 
