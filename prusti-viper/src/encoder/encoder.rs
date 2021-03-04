@@ -59,7 +59,8 @@ use crate::encoder::mirror_function_encoder::MirrorEncoder;
 use crate::encoder::snapshot::encoder::SnapshotEncoder;
 use crate::encoder::purifier;
 use crate::encoder::array_encoder::{ArrayTypesEncoder, EncodedArrayTypes, EncodedSliceTypes};
-use crate::encoder::counterexample::*;
+use crate::encoder::backtranslation::backtranslate;
+use crate::encoder::counterexample::Counterexample;
 use viper::SiliconCounterexample;
 use crate::encoder::places::LocalVariableManager;
 
