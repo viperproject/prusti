@@ -689,6 +689,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> MirEncoder<'p, 'v, 'tcx> {
                         String::from("number"),
                         self.encode_operand_expr_type(operand).with_span(span)?,
                     )];
+                    println!("mir_encoder: {:?}", self.def_id);
                     let pos = self
                         .encoder
                         .error_manager()

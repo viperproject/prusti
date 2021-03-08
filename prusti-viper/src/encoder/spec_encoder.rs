@@ -58,6 +58,7 @@ pub fn encode_spec_assertion<'v, 'tcx: 'v>(
     target_return: Option<&vir::Expr>,
     targets_are_values: bool,
     assertion_location: Option<mir::BasicBlock>,
+    parent_def_id: DefId,
 ) -> SpannedEncodingResult<vir::Expr> {
     let spec_encoder = SpecEncoder::new(
         encoder,
@@ -66,6 +67,7 @@ pub fn encode_spec_assertion<'v, 'tcx: 'v>(
         target_return,
         targets_are_values,
         assertion_location,
+        parent_def_id,
     );
     spec_encoder.encode_assertion(assertion)
 }
@@ -82,6 +84,9 @@ struct SpecEncoder<'p, 'v: 'p, 'tcx: 'v> {
     targets_are_values: bool,
     /// Location at which to encode loop invariants.
     assertion_location: Option<mir::BasicBlock>,
+    /// When registering errors, this gives us their
+    /// associated function
+    parent_def_id: DefId,
 }
 
 impl<'p, 'v: 'p, 'tcx: 'v> SpecEncoder<'p, 'v, 'tcx> {
@@ -92,6 +97,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> SpecEncoder<'p, 'v, 'tcx> {
         target_return: Option<&'p vir::Expr>,
         targets_are_values: bool,
         assertion_location: Option<mir::BasicBlock>,
+        parent_def_id: DefId,
     ) -> Self {
         trace!("SpecEncoder constructor");
 
@@ -102,6 +108,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> SpecEncoder<'p, 'v, 'tcx> {
             target_return,
             targets_are_values,
             assertion_location,
+            parent_def_id,
         }
     }
 
@@ -553,6 +560,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> SpecEncoder<'p, 'v, 'tcx> {
             self.encoder,
             &mir,
             def_id,
+            self.parent_def_id,
         );
         let initial_state = run_backward_interpretation_point_to_point(
             &mir,
@@ -578,7 +586,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> SpecEncoder<'p, 'v, 'tcx> {
         debug!("encode_expression {:?}", assertion_expr);
 
         let mut curr_def_id = assertion_expr.expr.to_def_id();
-        let mut curr_expr = self.encoder.encode_pure_expression(curr_def_id)?;
+        let mut curr_expr = self.encoder.encode_pure_expression(curr_def_id, self.parent_def_id)?;
 
         loop {
             let done = self.encoder.get_single_closure_instantiation(curr_def_id).is_none();
@@ -670,7 +678,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> SpecEncoder<'p, 'v, 'tcx> {
                 label.clone()
             }
         });
-
+        println!("spec_encoder : {:?}", self.parent_def_id);
         debug!("MIR expr {:?} --> {}", assertion_expr.id, curr_expr);
         Ok(curr_expr.set_default_pos(
             self.encoder
@@ -678,7 +686,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> SpecEncoder<'p, 'v, 'tcx> {
                 .register(
                     self.encoder.env().tcx().def_span(assertion_expr.expr),
                     ErrorCtxt::GenericExpression,
-                    curr_def_id),
+                    self.parent_def_id),
         ))
     }
 }
@@ -695,10 +703,11 @@ impl<'p, 'v: 'p, 'tcx: 'v> StraightLineBackwardInterpreter<'p, 'v, 'tcx> {
         encoder: &'p Encoder<'v, 'tcx>,
         mir: &'p mir::Body<'tcx>,
         def_id: DefId,
+        parent_def_id: DefId,
     ) -> Self {
         StraightLineBackwardInterpreter {
             interpreter: PureFunctionBackwardInterpreter::new(
-                encoder, mir, def_id, false,
+                encoder, mir, def_id, false, parent_def_id
             ),
         }
     }

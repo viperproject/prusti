@@ -2225,7 +2225,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                             let is_pure_function = self.encoder.is_pure(def_id);
                             if is_pure_function {
                                 let (function_name, _) = self.encoder
-                                    .encode_pure_function_use(def_id)
+                                    .encode_pure_function_use(def_id, self.proc_def_id)
                                     .with_span(term.source_info.span)?;
                                 debug!("Encoding pure function call '{}'", function_name);
                                 assert!(destination.is_some());
@@ -2848,7 +2848,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         destination: &Option<(mir::Place<'tcx>, BasicBlockIndex)>,
         called_def_id: ProcedureDefId,
     ) -> SpannedEncodingResult<Vec<vir::Stmt>> {
-        let (function_name, return_type) = self.encoder.encode_pure_function_use(called_def_id)
+        let (function_name, return_type) = self.encoder.encode_pure_function_use(called_def_id, self.proc_def_id)
             .with_span(call_site_span)?;
         debug!("Encoding pure function call '{}'", function_name);
         assert!(destination.is_some());
