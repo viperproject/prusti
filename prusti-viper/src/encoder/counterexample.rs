@@ -38,11 +38,13 @@ impl fmt::Display for Counterexample {
                 write!(f, "Counterexample:\n");
                 write!(f, "initial args:\n");
                 for (name, entry) in args {
-                    write!(f, "{} <- {}\n", name, entry);
+                    let s = format!("{} <- {}\n", name, entry);
+                    write!(f, "{}", indent(s));
                 }
                 write!(f, "\nlocal values when failing:\n");
                 for (name, entry) in entries {
-                    write!(f, "{} <- {}\n", name, entry);
+                    let s = format!("{} <- {}\n", name, entry);
+                    write!(f, "{}", indent(s));
                 }
                 write!(f, "\nresult <- {}", result)
             },
@@ -87,13 +89,16 @@ impl fmt::Display for Entry{
             Entry::Enum { super_name, name, named_fields, field_names, field_entries } => {
                 write!(f, "{}::{}", super_name, name);
                 let length = field_entries.len();
+                let mut fields_string = "".to_owned();
                 if length > 0{
                     if *named_fields {
-                        write!(f, "{{");
+                        fields_string.push_str("{");
                         for i in 0..length{
-                            write!(f, "\n\t{} <- {}", field_names[i], field_entries[i]);
+                            let s = format!("\n{} <- {}", field_names[i], field_entries[i]);
+                            fields_string.push_str(&s);
                         }
-                        write!(f, "\n}}")
+                        write!(f, "{}", indent(fields_string));
+                        write!(f, "}}")
                     } else {
                         write!(f, "(");
                         let len = length - 1;
@@ -102,9 +107,9 @@ impl fmt::Display for Entry{
                                 write!(f, "{}, ", entry);
                             } else {
                                 write!(f, "{}", entry);
+                            }
                         }
-                }
-                write!(f, ")\n")
+                        write!(f, ")")
                     }
                 } else {
                     write!(f, "")
@@ -113,10 +118,12 @@ impl fmt::Display for Entry{
             Entry::Struct { name, field_names, field_entries} => {
                 write!(f, "{} {{", name);
                 let len = field_names.len();
+                let mut fields_str = "".to_owned();
                 for i in 0..len{
-                    write!(f, "\n\t{} <- {}", field_names[i], field_entries[i]);
+                    let s = format!("\n{} <- {}", field_names[i], field_entries[i]);
+                    fields_str.push_str(&s);
                 }
-                write!(f, "\n}}\n")
+                write!(f, "{}}}\n", indent(fields_str))
             },
             Entry::Tuple { fields } => {
                 write!(f, "(");
@@ -128,7 +135,7 @@ impl fmt::Display for Entry{
                         write!(f, "{}", entry);
                     }
                 }
-                write!(f, ")\n")
+                write!(f, ")")
             },
             Entry::Unit => write!(f, "()"),
             _ => write!(f, "?")
@@ -136,5 +143,15 @@ impl fmt::Display for Entry{
     }
 }
 
+
+fn indent(s: String) -> String {
+    let mut res = "".to_owned();
+    for line in s.lines() {
+        res.push_str("  ");
+        res.push_str(line);
+        res.push_str("\n")
+    }
+    res
+}
 
 
