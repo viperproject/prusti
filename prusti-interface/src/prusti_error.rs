@@ -25,6 +25,7 @@ pub struct PrustiError {
     span: MultiSpan,
     help: Option<String>,
     note: Option<(String, MultiSpan)>,
+    additional_notes: Vec<(String, Option<MultiSpan>)>,
 }
 
 impl PrustiError {
@@ -36,6 +37,7 @@ impl PrustiError {
             span,
             help: None,
             note: None,
+            additional_notes: vec![]
         }
     }
 
@@ -106,6 +108,7 @@ impl PrustiError {
                 &self.message,
                 &self.help,
                 &self.note,
+                &self.additional_notes,
             );
         } else {
             env.span_warn_with_help_and_note(
@@ -136,6 +139,10 @@ impl PrustiError {
             self.span = span.clone();
         }
         self
+    }
+
+    pub fn add_note(&mut self, message: String, opt_span: Option<MultiSpan>) {
+        self.additional_notes.push((message, opt_span));
     }
 }
 

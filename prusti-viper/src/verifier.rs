@@ -320,9 +320,8 @@ impl<'v, 'tcx> Verifier<'v, 'tcx> {
 
             for verification_error in verification_errors {
                 debug!("Verification error: {:?}", verification_error);
-                let prusti_error = error_manager.translate_verification_error(&verification_error);
+                let mut prusti_error = error_manager.translate_verification_error(&verification_error);
                 debug!("Prusti error: {:?}", prusti_error);
-                prusti_error.emit(self.env);
                 
                 //counterexamples:
                 match error_manager.get_def_id(&verification_error) {
@@ -331,10 +330,12 @@ impl<'v, 'tcx> Verifier<'v, 'tcx> {
                         let def_id = *id;
                         let silicon_counterexample = verification_error.counterexample;
                         let counterexample = self.encoder.get_counterexample(def_id, silicon_counterexample);
-                        counterexample.emit();
+                        prusti_error.add_note(counterexample.to_string(), None);
                     },
                     None => (),
                 }
+
+                prusti_error.emit(self.env);
             }
             VerificationResult::Failure
         }

@@ -13,7 +13,7 @@ pub enum Counterexample {
 
 impl Counterexample{
     pub fn emit(&self) {
-        match self{
+        match self {
             Counterexample::Success{result, args, entries} => {
                 println!("\nCounterexample:");
                 println!("initial args:");
@@ -27,6 +27,26 @@ impl Counterexample{
                 println!("\nresult <- {}", result)
             },
             _ => ()
+        }
+    }
+}
+
+impl fmt::Display for Counterexample {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Counterexample::Success{result, args, entries} => {
+                write!(f, "Counterexample:\n");
+                write!(f, "initial args:\n");
+                for (name, entry) in args {
+                    write!(f, "{} <- {}\n", name, entry);
+                }
+                write!(f, "\nlocal values when failing:\n");
+                for (name, entry) in entries {
+                    write!(f, "{} <- {}\n", name, entry);
+                }
+                write!(f, "\nresult <- {}", result)
+            },
+            _ => write!(f, "Counterexample generation failed")
         }
     }
 }

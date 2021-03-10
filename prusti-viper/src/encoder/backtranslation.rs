@@ -34,26 +34,20 @@ pub fn backtranslate<'tcx>(
                 if let Some(local) = place.as_local() {
                     local
                 } else {
-                    unimplemented!();
+                    continue;
                 }
             } else {
-                unimplemented!();
+                continue;
             };
             let index = local.index();
             let var_local = Local::from(local);
             let typ = local_variable_manager.get_type(var_local);
             let vir_name = local_variable_manager.get_name(var_local);
             entries_to_process.push((rust_name.clone(), vir_name.clone(), typ));
-/*
-            let opt_entry = silicon_ce.get_entry_at_label(&vir_name, last_label);
-            let entry = backtranslate_entry(typ, opt_entry, tcx);
-            entries.insert(rust_name.clone(), entry);
-*/
+            
+            //if index indicates it is an argument
             if index > 0 && index <= arg_count {
                 args_to_process.push((rust_name, vir_name, typ))
-                /*let opt_entry = silicon_ce.get_entry_at_label(&vir_name, Some(&String::from("l0")));
-                let arg_entry = backtranslate_entry(typ, opt_entry, tcx);
-                args.insert(rust_name, arg_entry);*/
             }
         }
 
@@ -70,6 +64,7 @@ pub fn backtranslate<'tcx>(
             let typ = local_variable_manager.get_type(return_local);
             Some((rust_name, vir_name, typ))
         } else {
+            //this case should probably never occur
             None
         };
         
@@ -79,7 +74,7 @@ pub fn backtranslate<'tcx>(
         let mut args = HashMap::new();
         let result = if !is_pure {
             for (rust_name, vir_name, typ) in args_to_process {
-                let opt_entry = silicon_ce.get_entry_at_label(&vir_name, Some(&String::from("l8")));
+                let opt_entry = silicon_ce.get_entry_at_label(&vir_name, Some(&String::from("l2")));
                 let entry = backtranslate_entry(typ, opt_entry, tcx);
                 args.insert(rust_name, entry);
             }
@@ -92,6 +87,7 @@ pub fn backtranslate<'tcx>(
                 None => Entry::Unit,
                 Some((rust_name, vir_name, typ)) => {
                     let opt_entry = silicon_ce.get_entry_at_label(&vir_name, last_label);
+                    println!("result entry: {:?}", opt_entry);
                     backtranslate_entry(typ, opt_entry, tcx)
                 }
             }
@@ -111,18 +107,16 @@ pub fn backtranslate<'tcx>(
             }
         };
         
-        println!("arguments: {:?}", args);
-        println!("final entries: {:?}", entries);
-        println!("result <- {:?}", result);
-        Counterexample::Success{ result, args, entries}
+        Counterexample::Success {result, args, entries}
     } else {
-        Counterexample::Failure(String::from("there"))
+        Counterexample::Failure(String::from("no counterexample generated"))
     }
 }
 
 
 
 fn backtranslate_entry<'tcx>(typ: Ty<'tcx>, sil_entry: Option<&ModelEntry>, tcx: &TyCtxt<'tcx>) -> Entry {
+    //TODO: even if there is no matching entry, we might want some information.
     match sil_entry {
         None => Entry::UnknownEntry,
         Some(entry) => {
@@ -194,20 +188,24 @@ fn backtranslate_entry<'tcx>(typ: Ty<'tcx>, sil_entry: Option<&ModelEntry>, tcx:
                     }
                 },
                 ty::TyKind::Tuple(subst) => {
-                    match entry{
-                        ModelEntry::RefEntry(name, map) => {
-                            let mut fields = vec![];
-                            let len = subst.types().count();
-                            for i in 0..len{
-                                let typ = subst.type_at(i);
-                                let field_id = format!("tuple_{}", i).to_string();
-                                let field_entry = map.get(&field_id);
-                                let rec_entry = backtranslate_entry(typ, field_entry, tcx);
-                                fields.push(rec_entry);
-                            }
-                            Entry::Tuple{fields}
-                        },
-                        _ => Entry::UnknownEntry
+                    let len = subst.types().count();
+                    if len > 0 {
+                        match entry{
+                            ModelEntry::RefEntry(name, map) => {
+                                let mut fields = vec![];
+                                for i in 0..len{
+                                    let typ = subst.type_at(i);
+                                    let field_id = format!("tuple_{}", i).to_string();
+                                    let field_entry = map.get(&field_id);
+                                    let rec_entry = backtranslate_entry(typ, field_entry, tcx);
+                                    fields.push(rec_entry);
+                                }
+                                Entry::Tuple{fields}
+                            },
+                            _ => Entry::UnknownEntry
+                        }
+                    } else {
+                        Entry::Unit
                     }
                 },
                 ty::TyKind::Adt(adt_def, subst) => {
@@ -277,7 +275,6 @@ fn backtranslate_entry<'tcx>(typ: Ty<'tcx>, sil_entry: Option<&ModelEntry>, tcx:
                                         Some(var_def) => {
                                             let sil_name = format!("enum_{}", variant_name).to_string();
                                             let opt_enum_entry = m.get(&sil_name);
-                                            println!("found entry: {:?}", opt_enum_entry); 
                                             //at this point it should be a subroutine same for structs and enum:
                                             match opt_enum_entry {
                                                 //do the extraction
@@ -285,16 +282,14 @@ fn backtranslate_entry<'tcx>(typ: Ty<'tcx>, sil_entry: Option<&ModelEntry>, tcx:
                                                     for f in &var_def.fields{
                                                         let field_name = f.ident.name.to_ident_string();
                                                         let typ = f.ty(*tcx, subst);
-                                                        println!("field: {} : {:?}", field_name, typ);
 
                                                         //extract recursively:
                                                         let sil_name = format!("f${}", field_name).to_string();
                                                         let rec_entry = map2.get(&sil_name);
-                                                        println!("found entry  {:?} for {}", rec_entry, sil_name);
                                                         let field_entry = match rec_entry {
                                                             Some(ModelEntry::RecursiveRefEntry(name)) => {
                                                                 assert!(refname == name);
-                                                                backtranslate_entry(typ, Some(entry), tcx)
+                                                                backtranslate_entry(typ, opt_enum_entry, tcx)
                                                             },
                                                             _ => backtranslate_entry(typ, rec_entry, tcx),
                                                         };

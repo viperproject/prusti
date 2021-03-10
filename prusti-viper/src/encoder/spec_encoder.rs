@@ -678,7 +678,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> SpecEncoder<'p, 'v, 'tcx> {
                 label.clone()
             }
         });
-        println!("spec_encoder : {:?}", self.parent_def_id);
         debug!("MIR expr {:?} --> {}", assertion_expr.id, curr_expr);
         Ok(curr_expr.set_default_pos(
             self.encoder

@@ -371,7 +371,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> PureFunctionEncoder<'p, 'v, 'tcx> {
         let post = func_spec.into_iter().conjoin();
 
         // TODO: use a better span
-        println!("pure_function_encoder #1: {:?}", self.proc_def_id);
         let postcondition_pos = self
             .encoder
             .error_manager()
