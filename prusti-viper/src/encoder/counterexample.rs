@@ -1,32 +1,31 @@
 use std::collections::HashMap;
 use std::fmt;
-
+use rustc_span::MultiSpan;
+use prusti_interface::PrustiError;
 
 pub enum Counterexample {
     Success{
         result: Entry,
-        args: HashMap<String, Entry>,
-        entries: HashMap<String, Entry>
+        args: HashMap<(String, MultiSpan), Entry>,
+        entries: HashMap<(String, MultiSpan), Entry>
     },
     Failure(String),
 }
 
 impl Counterexample{
-    pub fn emit(&self) {
-        match self {
-            Counterexample::Success{result, args, entries} => {
-                println!("\nCounterexample:");
-                println!("initial args:");
-                for (name, entry) in args {
-                    println!("{} <- {}", name, entry);
+    pub fn apply_prusti_error(&self, prusti_error: &mut PrustiError) {
+        if let Counterexample::Success{result, args, entries} = self {
+            for (place, entry) in entries {
+                if let Some(entry_arg) = args.get(place) {
+                    let note = format!{"\n  initial: {} <- {}\n  final: {} <- {}", place.0, entry_arg, place.0, entry};
+                    prusti_error.add_note(note, Some(place.1.clone()));
+                } else {
+                    let note = format!{"{} <- {}", place.0, entry};
+                    prusti_error.add_note(note, Some(place.1.clone()));
                 }
-                println!("\nlocal values when failing:");
-                for (name, entry) in entries {
-                    println!("{} <- {}", name, entry);
-                }
-                println!("\nresult <- {}", result)
-            },
-            _ => ()
+            }
+            let result_note = format!{"result <- {}", result};
+            prusti_error.add_note(result_note, None);
         }
     }
 }
@@ -37,13 +36,13 @@ impl fmt::Display for Counterexample {
             Counterexample::Success{result, args, entries} => {
                 write!(f, "Counterexample:\n");
                 write!(f, "initial args:\n");
-                for (name, entry) in args {
-                    let s = format!("{} <- {}\n", name, entry);
+                for (place, entry) in args {
+                    let s = format!("{} <- {}\n", place.0, entry);
                     write!(f, "{}", indent(s));
                 }
                 write!(f, "\nlocal values when failing:\n");
-                for (name, entry) in entries {
-                    let s = format!("{} <- {}\n", name, entry);
+                for (place, entry) in entries {
+                    let s = format!("{} <- {}\n", place.0, entry);
                     write!(f, "{}", indent(s));
                 }
                 write!(f, "\nresult <- {}", result)

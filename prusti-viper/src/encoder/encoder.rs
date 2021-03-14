@@ -1450,13 +1450,6 @@ impl<'v, 'tcx> Encoder<'v, 'tcx> {
         let mir = procedure.get_mir();
         let tyctxt = &self.env.tcx();
         let is_pure = self.is_pure(def_id);
-        /*
-        let var_debug_info = mir.var_debug_info.clone();
-        let locals = mir.local_decls.clone();
-        let arg_count = mir.arg_count;
-        let local_manager = LocalVariableManager::new(&locals); 
-        */
-
         backtranslate(silicon_counterexample, mir, is_pure, tyctxt)
     }
 }

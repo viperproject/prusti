@@ -1,15 +1,17 @@
+use std::collections::HashMap;
+use std::convert::TryFrom;
+
+use viper::silicon_counterexample::*;
+use viper::VerificationError;
 use prusti_interface::data::ProcedureDefId;
 use prusti_common::vir::CfgMethod;
-use std::collections::HashMap;
-use viper::silicon_counterexample::*;
 use crate::encoder::Encoder;
-use viper::VerificationError;
 use crate::encoder::places::{Local, LocalVariableManager, Place};
 use crate::encoder::counterexample::*;
-use std::convert::TryFrom;
 
 use rustc_middle::mir;
 use rustc_middle::ty::{self, Ty, AdtKind, AdtDef, TyCtxt};
+use rustc_span::MultiSpan;
 
 pub fn backtranslate<'tcx>(
     silicon_counterexample: Option<SiliconCounterexample>,
@@ -22,14 +24,23 @@ pub fn backtranslate<'tcx>(
         let var_debug_info = mir.var_debug_info.clone();
         let local_variable_manager = LocalVariableManager::new(&mir.local_decls);
         let arg_count = mir.arg_count;
+
+        println!("var_debug_info: {:?}", var_debug_info);
+
+        //optimally (at a later stage) we would use the "main" counterexample 
+        //from silicon, the one not associated with any label, because it contains
+        //the values of the function when it fails. But currently
+        //most values can not be obtained there because they're folded
         let last_label = silicon_ce.label_order.last();
         
         //to be processed:
-        let mut args_to_process: Vec<(String, String, Ty)> = vec![];
-        let mut entries_to_process: Vec<(String, String, Ty)> = vec![];
+        let mut args_to_process: Vec<(String, MultiSpan, String, Ty)> = vec![];
+        let mut entries_to_process: Vec<(String, MultiSpan, String, Ty)> = vec![];
 
         for vdi in var_debug_info{
             let rust_name = vdi.name.to_ident_string();
+            let span = vdi.source_info.span;
+            let multi_span = MultiSpan::from_span(span);
             let local: mir::Local = if let mir::VarDebugInfoContents::Place(place) = vdi.value {
                 if let Some(local) = place.as_local() {
                     local
@@ -43,11 +54,11 @@ pub fn backtranslate<'tcx>(
             let var_local = Local::from(local);
             let typ = local_variable_manager.get_type(var_local);
             let vir_name = local_variable_manager.get_name(var_local);
-            entries_to_process.push((rust_name.clone(), vir_name.clone(), typ));
+            entries_to_process.push((rust_name.clone(), multi_span.clone(), vir_name.clone(), typ));
             
             //if index indicates it is an argument
             if index > 0 && index <= arg_count {
-                args_to_process.push((rust_name, vir_name, typ))
+                args_to_process.push((rust_name, multi_span, vir_name, typ))
             }
         }
 
@@ -55,6 +66,7 @@ pub fn backtranslate<'tcx>(
         let return_local = Local::from(mir::Local::from_usize(0));
         //make sure
         let result_to_process = if local_variable_manager.is_return(return_local){
+            //open question: what would be the right span for return type? None?
             let rust_name = String::from("result");
             let vir_name = if !is_pure {
                 local_variable_manager.get_name(return_local)
@@ -73,15 +85,15 @@ pub fn backtranslate<'tcx>(
         let mut entries = HashMap::new();
         let mut args = HashMap::new();
         let result = if !is_pure {
-            for (rust_name, vir_name, typ) in args_to_process {
-                let opt_entry = silicon_ce.get_entry_at_label(&vir_name, Some(&String::from("l2")));
+            for (rust_name, span, vir_name, typ) in args_to_process {
+                let opt_entry = silicon_ce.get_entry_at_label(&vir_name, Some(&String::from("l0")));
                 let entry = backtranslate_entry(typ, opt_entry, tcx);
-                args.insert(rust_name, entry);
+                args.insert((rust_name, span), entry);
             }
-            for (rust_name, vir_name, typ) in entries_to_process {
+            for (rust_name, span, vir_name, typ) in entries_to_process {
                 let opt_entry = silicon_ce.get_entry_at_label(&vir_name, last_label);
                 let entry = backtranslate_entry(typ, opt_entry, tcx);
-                entries.insert(rust_name, entry);
+                entries.insert((rust_name, span), entry);
             }
             match result_to_process {
                 None => Entry::Unit,
@@ -92,10 +104,10 @@ pub fn backtranslate<'tcx>(
                 }
             }
         } else {
-            for (rust_name, vir_name, typ) in args_to_process {
+            for (rust_name, span, vir_name, typ) in args_to_process {
                 let opt_entry = silicon_ce.get_entry_at_label(&vir_name, None);
                 let entry = backtranslate_entry(typ, opt_entry, tcx);
-                args.insert(rust_name, entry);
+                args.insert((rust_name, span), entry);
             }
             match result_to_process {
                 None => Entry::Unit,

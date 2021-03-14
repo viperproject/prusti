@@ -330,7 +330,7 @@ impl<'v, 'tcx> Verifier<'v, 'tcx> {
                         let def_id = *id;
                         let silicon_counterexample = verification_error.counterexample;
                         let counterexample = self.encoder.get_counterexample(def_id, silicon_counterexample);
-                        prusti_error.add_note(counterexample.to_string(), None);
+                        counterexample.apply_prusti_error(&mut prusti_error); 
                     },
                     None => (),
                 }
