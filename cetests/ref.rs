@@ -1,10 +1,11 @@
 use prusti_contracts::*;
 
 #[requires(*x != 0)]
-#[ensures(false)]
-fn foo(x: &i32) -> i32{
+#[ensures(result != 0)]
+fn foo(x: &mut i32) -> i32{
     let mut y = *x;
-    y = y * 3;
+    y = y * 3 - 12;
+    *x = y;
     y
 }
 

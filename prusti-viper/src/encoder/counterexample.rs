@@ -7,33 +7,48 @@ pub enum Counterexample {
     Success{
         result: Entry,
         args: HashMap<(String, MultiSpan), Entry>,
-        entries: HashMap<(String, MultiSpan), Entry>
+        entries: HashMap<(String, MultiSpan), Entry>,
+        is_pure: bool,
     },
     Failure(String),
 }
 
 impl Counterexample{
     pub fn apply_prusti_error(&self, prusti_error: &mut PrustiError) {
-        if let Counterexample::Success{result, args, entries} = self {
-            for (place, entry) in entries {
-                if let Some(entry_arg) = args.get(place) {
-                    let note = format!{"\n  initial: {} <- {}\n  final: {} <- {}", place.0, entry_arg, place.0, entry};
-                    prusti_error.add_note(note, Some(place.1.clone()));
-                } else {
-                    let note = format!{"{} <- {}", place.0, entry};
+        if let Counterexample::Success{result, args, entries, is_pure} = self {
+            if *is_pure {
+                for (place, entry) in entries {
+                    if let Some(entry_arg) = args.get(place) {
+                        let note = format!("counterexample for argument \"{0}\"\ninitial: {0} <- {1}\nfinal: {0} <- {2}", 
+                            place.0, 
+                            indent(entry_arg.to_string()),  
+                            indent(entry.to_string()));
+                        prusti_error.add_note(note, Some(place.1.clone()));
+                    } else {
+                        let note = format!("counterexample for local {0}\n  {0} <- {1}", place.0, entry);
+                        prusti_error.add_note(note, Some(place.1.clone()));
+                    }
+                }
+                let result_note = format!{"result <- {}", result};
+                prusti_error.add_note(result_note, None);
+            } else {
+                for (place, entry) in args {
+                    let note = format!("counterexample for argument \"{0}\"\n{0} <- {1}", 
+                            place.0,   
+                            indent(entry.to_string()));
                     prusti_error.add_note(note, Some(place.1.clone()));
                 }
+                let result_note = format!("result <- {}", result);
+                prusti_error.add_note(result_note, None);
             }
-            let result_note = format!{"result <- {}", result};
-            prusti_error.add_note(result_note, None);
-        }
+        } 
     }
 }
 
 impl fmt::Display for Counterexample {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Counterexample::Success{result, args, entries} => {
+            Counterexample::Success{result, args, entries, is_pure} => {
                 write!(f, "Counterexample:\n");
                 write!(f, "initial args:\n");
                 for (place, entry) in args {
@@ -84,7 +99,7 @@ impl fmt::Display for Entry{
             Entry::IntEntry { value } => write!(f, "{}", value),
             Entry::BoolEntry { value } => write!(f, "{}", value),
             Entry::CharEntry { value } => write!(f, "'{}' ({:x})", value, *value as i32),
-            Entry::RefEntry { el } => write!(f, "ref( {})", *el),
+            Entry::RefEntry { el } => write!(f, "ref({})", indent(el.to_string())),
             Entry::Enum { super_name, name, named_fields, field_names, field_entries } => {
                 write!(f, "{}::{}", super_name, name);
                 let length = field_entries.len();
@@ -142,15 +157,22 @@ impl fmt::Display for Entry{
     }
 }
 
-
+//for printing multiline-entries, indents all but the first line
 fn indent(s: String) -> String {
-    let mut res = "".to_owned();
-    for line in s.lines() {
-        res.push_str("  ");
-        res.push_str(line);
-        res.push_str("\n")
+    if(s.len() > 1) {
+        let mut res = "".to_owned();
+        let mut lines = s.lines();
+        res.push_str(lines.next().unwrap());
+        res.push_str("\n");
+        while let Some(l) = lines.next() {
+            res.push_str("  ");
+            res.push_str(l);
+            res.push_str("\n");
+        }
+        res
+    } else {
+        s
     }
-    res
 }
 
 

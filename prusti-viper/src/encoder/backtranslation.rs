@@ -31,8 +31,13 @@ pub fn backtranslate<'tcx>(
         //from silicon, the one not associated with any label, because it contains
         //the values of the function when it fails. But currently
         //most values can not be obtained there because they're folded
-        let last_label = silicon_ce.label_order.last();
-        
+        let last_label: Option<&String>= silicon_ce.label_order.last();
+        //optimally this label would just be "old", but as of now mostly the values
+        //are not available at this point
+        let old_label = String::from("l0");
+
+
+
         //to be processed:
         let mut args_to_process: Vec<(String, MultiSpan, String, Ty)> = vec![];
         let mut entries_to_process: Vec<(String, MultiSpan, String, Ty)> = vec![];
@@ -84,42 +89,64 @@ pub fn backtranslate<'tcx>(
         //now map those needed:
         let mut entries = HashMap::new();
         let mut args = HashMap::new();
+
+
         let result = if !is_pure {
-            for (rust_name, span, vir_name, typ) in args_to_process {
-                let opt_entry = silicon_ce.get_entry_at_label(&vir_name, Some(&String::from("l0")));
-                let entry = backtranslate_entry(typ, opt_entry, tcx);
-                args.insert((rust_name, span), entry);
+            if silicon_ce.old_models.contains_key(&old_label){ 
+                println!("found label l0");
+                let silicon_arg_entries = silicon_ce.old_models
+                    .get(&old_label)
+                    .map(|x| &(x.entries))
+                    .unwrap();
+                
+        
+                for (rust_name, span, vir_name, typ) in args_to_process {
+                    let opt_entry = silicon_arg_entries.get(&vir_name);
+                    let entry = backtranslate_entry(typ, opt_entry, tcx, silicon_arg_entries);
+                    args.insert((rust_name, span), entry);
+                }
             }
+
+            let silicon_final_entries = if last_label.is_some() {
+                silicon_ce.old_models
+                    .get(last_label.unwrap())
+                    .map(|x| &(x.entries))
+                    .unwrap()
+                } else {
+                    &silicon_ce.model.entries 
+                };
+
             for (rust_name, span, vir_name, typ) in entries_to_process {
-                let opt_entry = silicon_ce.get_entry_at_label(&vir_name, last_label);
-                let entry = backtranslate_entry(typ, opt_entry, tcx);
+                let opt_entry = silicon_final_entries.get(&vir_name);
+                let entry = backtranslate_entry(typ, opt_entry, tcx, silicon_final_entries);
                 entries.insert((rust_name, span), entry);
             }
             match result_to_process {
                 None => Entry::Unit,
                 Some((rust_name, vir_name, typ)) => {
-                    let opt_entry = silicon_ce.get_entry_at_label(&vir_name, last_label);
+                    let opt_entry = silicon_final_entries.get(&vir_name);
                     println!("result entry: {:?}", opt_entry);
-                    backtranslate_entry(typ, opt_entry, tcx)
+                    backtranslate_entry(typ, opt_entry, tcx, silicon_final_entries)
                 }
             }
         } else {
+            let silicon_entries = &silicon_ce.model.entries;
             for (rust_name, span, vir_name, typ) in args_to_process {
-                let opt_entry = silicon_ce.get_entry_at_label(&vir_name, None);
-                let entry = backtranslate_entry(typ, opt_entry, tcx);
+                let opt_entry = silicon_entries.get(&vir_name);
+                let entry = backtranslate_entry(typ, opt_entry, tcx, silicon_entries);
                 args.insert((rust_name, span), entry);
             }
             match result_to_process {
                 None => Entry::Unit,
                 Some((rust_name, vir_name, typ)) => {
                     let result_vir_name = String::from("Result()");
-                    let opt_entry = silicon_ce.get_entry_at_label(&result_vir_name, None);
-                    backtranslate_entry(typ, opt_entry, tcx)
+                    let opt_entry = silicon_entries.get(&result_vir_name);
+                    backtranslate_entry(typ, opt_entry, tcx, silicon_entries)
                 }
             }
         };
         
-        Counterexample::Success {result, args, entries}
+        Counterexample::Success {result, args, entries, is_pure}
     } else {
         Counterexample::Failure(String::from("no counterexample generated"))
     }
@@ -127,8 +154,12 @@ pub fn backtranslate<'tcx>(
 
 
 
-fn backtranslate_entry<'tcx>(typ: Ty<'tcx>, sil_entry: Option<&ModelEntry>, tcx: &TyCtxt<'tcx>) -> Entry {
-    //TODO: even if there is no matching entry, we might want some information.
+fn backtranslate_entry<'tcx>(
+    typ: Ty<'tcx>, 
+    sil_entry: Option<&ModelEntry>, 
+    tcx: &TyCtxt<'tcx>,
+    silicon_ce_entries: &HashMap<String, ModelEntry>,
+) -> Entry {
     match typ.kind(){
         ty::TyKind::Bool => {
             match sil_entry{
@@ -182,7 +213,8 @@ fn backtranslate_entry<'tcx>(typ: Ty<'tcx>, sil_entry: Option<&ModelEntry>, tcx:
         ty::TyKind::Ref(_, typ, _) => {
             if let Some(ModelEntry::RefEntry(name, map)) = sil_entry {
                 let entry = map.get(&String::from("val_ref"));
-                let rec_entry = backtranslate_entry(typ, entry, tcx);
+                println!("found ref-entry: {:?}", entry);
+                let rec_entry = backtranslate_entry(typ, entry, tcx, silicon_ce_entries);
                 Entry::RefEntry {el: Box::new(rec_entry)} 
             } else {
                 Entry::RefEntry {el: Box::new(Entry::UnknownEntry)}
@@ -197,7 +229,7 @@ fn backtranslate_entry<'tcx>(typ: Ty<'tcx>, sil_entry: Option<&ModelEntry>, tcx:
                         let typ = subst.type_at(i);
                         let field_id = format!("tuple_{}", i).to_string();
                         let field_entry = map.get(&field_id);
-                        let rec_entry = backtranslate_entry(typ, field_entry, tcx);
+                        let rec_entry = backtranslate_entry(typ, field_entry, tcx, silicon_ce_entries);
                         fields.push(rec_entry);
                     }
                     Entry::Tuple{fields}
@@ -222,6 +254,7 @@ fn backtranslate_entry<'tcx>(typ: Ty<'tcx>, sil_entry: Option<&ModelEntry>, tcx:
                         sil_entry,
                         tcx,
                         subst,
+                        silicon_ce_entries,
                     );
                     Entry::Struct{
                         name: struct_name,
@@ -235,11 +268,10 @@ fn backtranslate_entry<'tcx>(typ: Ty<'tcx>, sil_entry: Option<&ModelEntry>, tcx:
                     let mut variant_name = String::from("?");
                     let mut field_names = vec![];
                     let mut field_entries = vec![];
-                    if let Some(ModelEntry::RefEntry(_, map)) = sil_entry {
+                    if let Some(ModelEntry::RefEntry(name, map)) = sil_entry {
                         let disc_string = String::from("discriminant");
                         let mut variant = None;
                         let disc_entry = map.get(&disc_string);
-
                         //need to find a discriminant to do something
                         if let Some(&ModelEntry::LitIntEntry(x)) = disc_entry {
                             let discriminant = x as u32;
@@ -264,7 +296,8 @@ fn backtranslate_entry<'tcx>(typ: Ty<'tcx>, sil_entry: Option<&ModelEntry>, tcx:
                                 var_def,
                                 opt_enum_entry,
                                 tcx,
-                                subst
+                                subst,
+                                silicon_ce_entries,
                             );
                             field_names = result.0;
                             field_entries = result.1;
@@ -294,6 +327,7 @@ fn backtranslate_vardef<'tcx>(
     sil_entry: Option<&ModelEntry>, 
     tcx: &TyCtxt<'tcx>,
     subst: ty::subst::SubstsRef<'tcx>,
+    silicon_ce_entries: &HashMap<String, ModelEntry>,
 ) -> (Vec<String>, Vec<Entry>) {
     let mut field_names = vec![];
     let mut field_entries = vec![];
@@ -306,10 +340,12 @@ fn backtranslate_vardef<'tcx>(
             let rec_entry = map.get(&sil_name);
             let field_entry = match rec_entry {
                 Some(ModelEntry::RecursiveRefEntry(refname)) => {
-                    assert!(refname == name);
-                    backtranslate_entry(typ, sil_entry, tcx)
+                    //this unwrap should never fail unless
+                    //there is a fault in silicon's implementation
+                    let real_ref_entry = silicon_ce_entries.get(refname);
+                    backtranslate_entry(typ, real_ref_entry, tcx, silicon_ce_entries)
                 },
-                _ => backtranslate_entry(typ, rec_entry, tcx),
+                _ => backtranslate_entry(typ, rec_entry, tcx, silicon_ce_entries),
             };
             field_names.push(field_name);
             field_entries.push(field_entry);
