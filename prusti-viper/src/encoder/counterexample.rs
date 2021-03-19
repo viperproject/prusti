@@ -16,16 +16,16 @@ pub enum Counterexample {
 impl Counterexample{
     pub fn apply_prusti_error(&self, prusti_error: &mut PrustiError) {
         if let Counterexample::Success{result, args, entries, is_pure} = self {
-            if *is_pure {
+            if !*is_pure {
                 for (place, entry) in entries {
                     if let Some(entry_arg) = args.get(place) {
-                        let note = format!("counterexample for argument \"{0}\"\ninitial: {0} <- {1}\nfinal: {0} <- {2}", 
+                        let note = format!("counterexample for \"{0}\"\ninitial: {0} <- {1}\nfinal: {0} <- {2}", 
                             place.0, 
                             indent(entry_arg.to_string()),  
                             indent(entry.to_string()));
                         prusti_error.add_note(note, Some(place.1.clone()));
                     } else {
-                        let note = format!("counterexample for local {0}\n  {0} <- {1}", place.0, entry);
+                        let note = format!("counterexample for \"{0}\"\n{0} <- {1}", place.0, entry);
                         prusti_error.add_note(note, Some(place.1.clone()));
                     }
                 }

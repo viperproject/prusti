@@ -5188,9 +5188,16 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 // Note: in our encoding an enumeration with just one variant has
                 // no discriminant
                 if num_variants > 1 {
+                    let enum_id = encoded_src.to_string();
                     let encoded_rhs = self.encoder.encode_discriminant_func_app(
                         encoded_src,
                         adt_def,
+                    );
+                    //remember where discriminant can be found for counterexample
+                    self.encoder.add_discriminant_info(
+                        enum_id,
+                        encoded_lhs.to_string(), 
+                        self.proc_def_id
                     );
                     self.encode_copy_value_assign(
                         encoded_lhs.clone(),

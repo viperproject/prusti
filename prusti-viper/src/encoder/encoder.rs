@@ -59,8 +59,6 @@ use crate::encoder::mirror_function_encoder::MirrorEncoder;
 use crate::encoder::snapshot::encoder::SnapshotEncoder;
 use crate::encoder::purifier;
 use crate::encoder::array_encoder::{ArrayTypesEncoder, EncodedArrayTypes, EncodedSliceTypes};
-use crate::encoder::backtranslation::backtranslate;
-use crate::encoder::counterexample::Counterexample;
 use viper::SiliconCounterexample;
 use crate::encoder::places::LocalVariableManager;
 
@@ -114,7 +112,9 @@ pub struct Encoder<'v, 'tcx: 'v> {
     encoding_errors_counter: RefCell<usize>,
     name_interner: RefCell<NameInterner>,
     /// The procedure that is currently being encoded.
-    pub current_proc: RefCell<Option<ProcedureDefId>>
+    pub current_proc: RefCell<Option<ProcedureDefId>>,
+    /// Maps locals to the local of their discriminant.
+    discriminants_info: RefCell<HashMap<(ProcedureDefId, String), Vec<String>>>,
 }
 
 impl<'v, 'tcx> Encoder<'v, 'tcx> {
@@ -175,6 +175,7 @@ impl<'v, 'tcx> Encoder<'v, 'tcx> {
             encoding_errors_counter: RefCell::new(0),
             name_interner: RefCell::new(NameInterner::new()),
             current_proc: RefCell::new(None),
+            discriminants_info: RefCell::new(HashMap::new()),
         }
     }
 
@@ -1441,17 +1442,29 @@ impl<'v, 'tcx> Encoder<'v, 'tcx> {
             .encode_slice_types(self, slice_ty)
     }
 
+    pub fn add_discriminant_info(&self, enum_id: String, discr_id: String, proc_def_id: ProcedureDefId) {
+        println!("adding discriminantinfo: {} with discr {} \n in function {:?}", enum_id, discr_id, proc_def_id);
+        let mut map = self.discriminants_info.borrow_mut();
+        let mut previous_entries = map.get_mut(&(proc_def_id.clone(), enum_id.clone()));
+        match previous_entries {
+            None => {map.insert((proc_def_id, enum_id), vec![discr_id]);},
+            Some(v) => {
+                v.push(discr_id);
+            }
+        };
+    }
+
+    pub fn discriminants_info(&self) -> HashMap<(ProcedureDefId, String), Vec<String>> {
+        self.discriminants_info.borrow().clone()
+    }
+/*
     pub fn get_counterexample(
         &self, 
         def_id: ProcedureDefId,
         silicon_counterexample: Option<SiliconCounterexample>,
     ) -> Counterexample {
-        let procedure = self.env.get_procedure(def_id);
-        let mir = procedure.get_mir();
-        let tyctxt = &self.env.tcx();
-        let is_pure = self.is_pure(def_id);
-        backtranslate(silicon_counterexample, mir, is_pure, tyctxt)
-    }
+        backtranslate(&self, def_id, silicon_counterexample);
+    }*/
 }
 
 fn encode_identifier(ident: String) -> String {

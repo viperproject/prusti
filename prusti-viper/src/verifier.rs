@@ -10,6 +10,7 @@ use prusti_common::{
 };
 use crate::encoder::Encoder;
 use crate::encoder::counterexample;
+use crate::encoder::backtranslation::backtranslate;
 // use prusti_filter::validators::Validator;
 use prusti_interface::data::VerificationResult;
 use prusti_interface::data::VerificationTask;
@@ -329,7 +330,7 @@ impl<'v, 'tcx> Verifier<'v, 'tcx> {
                         //for now we assume we deal with non pure functions => should have a cfg_method
                         let def_id = *id;
                         let silicon_counterexample = verification_error.counterexample;
-                        let counterexample = self.encoder.get_counterexample(def_id, silicon_counterexample);
+                        let counterexample = backtranslate(&self.encoder, def_id, silicon_counterexample);
                         counterexample.apply_prusti_error(&mut prusti_error); 
                     },
                     None => (),
