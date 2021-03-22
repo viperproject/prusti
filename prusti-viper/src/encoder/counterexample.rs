@@ -18,11 +18,13 @@ impl Counterexample{
         if let Counterexample::Success{result, args, entries, is_pure} = self {
             if !*is_pure {
                 for (place, entry) in entries {
+                    //place is a tuple (Name of the variable, Option<Scope>)
                     if let Some(entry_arg) = args.get(place) {
                         let note = format!("counterexample for \"{0}\"\ninitial: {0} <- {1}\nfinal: {0} <- {2}", 
                             place.0, 
-                            indent(entry_arg.to_string()),  
-                            indent(entry.to_string()));
+                            entry_arg,  
+                            entry,
+                        );
                         prusti_error.add_note(note, Some(place.1.clone()));
                     } else {
                         let note = format!("counterexample for \"{0}\"\n{0} <- {1}", place.0, entry);
@@ -33,11 +35,13 @@ impl Counterexample{
                 prusti_error.add_note(result_note, None);
             } else {
                 for (place, entry) in args {
-                    let note = format!("counterexample for argument \"{0}\"\n{0} <- {1}", 
+                    let note = format!("counterexample for \"{0}\"\n{0} <- {1}", 
                             place.0,   
-                            indent(entry.to_string()));
+                            entry,
+                        );
                     prusti_error.add_note(note, Some(place.1.clone()));
                 }
+                // Todo: find span of return type to give this note a span
                 let result_note = format!("result <- {}", result);
                 prusti_error.add_note(result_note, None);
             }
@@ -85,6 +89,7 @@ pub enum Entry{
         field_names: Vec<String>,
         field_entries: Vec<Entry>
         //note: if fields are not named, their order is important!
+        //that is why no HashMap is used
     },
     Tuple{
         fields: Vec<Entry>
@@ -159,9 +164,10 @@ impl fmt::Display for Entry{
 
 //for printing multiline-entries, indents all but the first line
 fn indent(s: String) -> String {
-    if(s.len() > 1) {
-        let mut res = "".to_owned();
-        let mut lines = s.lines();
+    let mut res = "".to_owned();
+    let length = s.lines().count();
+    let mut lines = s.lines();
+    if length > 1 {
         res.push_str(lines.next().unwrap());
         res.push_str("\n");
         while let Some(l) = lines.next() {

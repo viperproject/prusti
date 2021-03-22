@@ -9,7 +9,7 @@ pub struct Whatever{
 
 pub fn main() {}
 
-#[requires(x.value != x.other_value)]
+#[requires(x.value != x.other_value && x.value != 42)]
 #[ensures(result.value!=42)]
 pub fn foo(x: Whatever) -> Whatever {
     if x.valid {

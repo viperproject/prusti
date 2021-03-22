@@ -33,7 +33,6 @@ impl Default for ViperBackendConfig {
                     verifier_args.push("--enableMoreCompleteExhale".to_string());
                 }
                 if config::produce_counterexample() {
-                    println!("recognized counterexample flag");
                     verifier_args.push("--counterexample".to_string());
                     verifier_args.push("mapped".to_string());
                 }

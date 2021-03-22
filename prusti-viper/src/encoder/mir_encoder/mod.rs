@@ -392,8 +392,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> MirEncoder<'p, 'v, 'tcx> {
         }
     }
 
-    pub fn def_id(&self) -> DefId { self.def_id }
-
     pub fn is_reference(&self, base_ty: ty::Ty<'tcx>) -> bool {
         trace!("is_reference {}", base_ty);
         matches!(base_ty.kind(), ty::TyKind::RawPtr(..) | ty::TyKind::Ref(..))

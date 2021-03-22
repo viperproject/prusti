@@ -161,8 +161,6 @@ impl<'a> Verifier<'a, state::Started> {
             .jni
             .is_instance_of(viper_result, "viper/silver/verifier/Failure");
         
-        
-        //TODO: understand this and extract counterexample here
         if is_failure {
             let mut errors: Vec<VerificationError> = vec![];
 

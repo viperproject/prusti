@@ -59,8 +59,6 @@ use crate::encoder::mirror_function_encoder::MirrorEncoder;
 use crate::encoder::snapshot::encoder::SnapshotEncoder;
 use crate::encoder::purifier;
 use crate::encoder::array_encoder::{ArrayTypesEncoder, EncodedArrayTypes, EncodedSliceTypes};
-use viper::SiliconCounterexample;
-use crate::encoder::places::LocalVariableManager;
 
 #[must_use]
 pub struct CleanupTyMapStack<'a, 'tcx> {
@@ -1443,7 +1441,6 @@ impl<'v, 'tcx> Encoder<'v, 'tcx> {
     }
 
     pub fn add_discriminant_info(&self, enum_id: String, discr_id: String, proc_def_id: ProcedureDefId) {
-        println!("adding discriminantinfo: {} with discr {} \n in function {:?}", enum_id, discr_id, proc_def_id);
         let mut map = self.discriminants_info.borrow_mut();
         let mut previous_entries = map.get_mut(&(proc_def_id.clone(), enum_id.clone()));
         match previous_entries {

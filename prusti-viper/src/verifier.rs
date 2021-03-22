@@ -4,13 +4,12 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use prusti_common::vir::{self, optimizations, ToViper, ToViperDecl, CfgMethod};
+use prusti_common::vir::{self, optimizations, ToViper, ToViperDecl};
 use prusti_common::{
     config, report::log, verification_context::VerifierBuilder, verification_service::*, Stopwatch,
 };
 use crate::encoder::Encoder;
-use crate::encoder::counterexample;
-use crate::encoder::backtranslation::backtranslate;
+use crate::encoder::backtranslation;
 // use prusti_filter::validators::Validator;
 use prusti_interface::data::VerificationResult;
 use prusti_interface::data::VerificationTask;
@@ -325,15 +324,13 @@ impl<'v, 'tcx> Verifier<'v, 'tcx> {
                 debug!("Prusti error: {:?}", prusti_error);
                 
                 //counterexamples:
-                match error_manager.get_def_id(&verification_error) {
-                    Some(id) => {
-                        //for now we assume we deal with non pure functions => should have a cfg_method
-                        let def_id = *id;
-                        let silicon_counterexample = verification_error.counterexample;
-                        let counterexample = backtranslate(&self.encoder, def_id, silicon_counterexample);
-                        counterexample.apply_prusti_error(&mut prusti_error); 
-                    },
-                    None => (),
+                if let Some(id) = error_manager.get_def_id(&verification_error) {
+                    let counterexample = backtranslation::backtranslate(
+                        &self.encoder, 
+                        *id,
+                        verification_error.counterexample
+                    );
+                    counterexample.apply_prusti_error(&mut prusti_error); 
                 }
 
                 prusti_error.emit(self.env);
