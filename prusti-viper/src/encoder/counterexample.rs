@@ -25,7 +25,7 @@ impl Counterexample {
         }
     }
 
-    pub fn apply_prusti_error(&self, prusti_error: &mut PrustiError) {
+    pub fn annotate_error(&self, prusti_error: &mut PrustiError) {
         if !self.is_pure {
             for (place, entry) in &self.entries {
                 //place is a tuple (Name of the variable, Option<Scope>)
@@ -41,7 +41,7 @@ impl Counterexample {
                     prusti_error.add_note(note, Some(place.1.clone()));
                 }
             }
-            let result_note = format!{"result <- {}", self.result};
+            let result_note = format!("result <- {}", self.result);
             prusti_error.add_note(result_note, None);
         } else {
             for (place, entry) in &self.args {
@@ -76,48 +76,47 @@ impl fmt::Display for Counterexample {
 }
 
 #[derive(Debug)]
-pub enum Entry{
-    IntEntry{value: i64},
-    BoolEntry{value: bool},
-    CharEntry{value: char},
-    RefEntry{el: Box<Entry>},
-    Struct{
+pub enum Entry {
+    IntEntry { value: i64 },
+    BoolEntry { value: bool },
+    CharEntry { value: char },
+    RefEntry { el: Box<Entry> },
+    Struct {
         name: String,
-        field_names: Vec<String>,
-        field_entries: Vec<Entry>
+        field_entries: Vec<(String, Entry)>,
     },
-    Enum{
+    Enum {
         super_name: String,
         name: String,
-        named_fields: bool,
-        field_names: Vec<String>,
-        field_entries: Vec<Entry>
+        field_entries: Vec<(String, Entry)>,
         //note: if fields are not named, their order is important!
         //that is why no HashMap is used
     },
-    Tuple{
-        fields: Vec<Entry>
+    Tuple {
+        fields: Vec<Entry>,
     },
     Unit,
-    UnknownEntry
+    UnknownEntry,
 }
 
-impl fmt::Display for Entry{
+impl fmt::Display for Entry {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self{
+        match self {
             Entry::IntEntry { value } => write!(f, "{}", value),
             Entry::BoolEntry { value } => write!(f, "{}", value),
             Entry::CharEntry { value } => write!(f, "'{}' ({:x})", value, *value as i32),
             Entry::RefEntry { el } => write!(f, "ref({})", indent(el.to_string())),
-            Entry::Enum { super_name, name, named_fields, field_names, field_entries } => {
+            Entry::Enum { super_name, name, field_entries } => {
                 write!(f, "{}::{}", super_name, name);
                 let length = field_entries.len();
                 let mut fields_string = "".to_owned();
-                if length > 0{
-                    if *named_fields {
+                let named_fields = field_entries.len() > 0 && !field_entries[0].0.parse::<usize>().is_ok();
+
+                if length > 0 {
+                    if named_fields {
                         fields_string.push_str("{");
                         for i in 0..length{
-                            let s = format!("\n{} <- {}", field_names[i], field_entries[i]);
+                            let s = format!("\n{} <- {}", field_entries[i].0, field_entries[i].1);
                             fields_string.push_str(&s);
                         }
                         write!(f, "{}", indent(fields_string));
@@ -127,9 +126,9 @@ impl fmt::Display for Entry{
                         let len = length - 1;
                         for (i, entry) in (*field_entries).iter().enumerate(){
                             if i < len {
-                                write!(f, "{}, ", entry);
+                                write!(f, "{}, ", entry.1);
                             } else {
-                                write!(f, "{}", entry);
+                                write!(f, "{}", entry.1);
                             }
                         }
                         write!(f, ")")
@@ -138,12 +137,12 @@ impl fmt::Display for Entry{
                     write!(f, "")
                 }
             }
-            Entry::Struct { name, field_names, field_entries} => {
+            Entry::Struct { name, field_entries } => {
                 write!(f, "{} {{", name);
-                let len = field_names.len();
+                let len = field_entries.len();
                 let mut fields_str = "".to_owned();
                 for i in 0..len{
-                    let s = format!("\n{} <- {}", field_names[i], field_entries[i]);
+                    let s = format!("\n{} <- {}", field_entries[i].0, field_entries[i].1);
                     fields_str.push_str(&s);
                 }
                 write!(f, "{}}}\n", indent(fields_str))
@@ -151,7 +150,7 @@ impl fmt::Display for Entry{
             Entry::Tuple { fields } => {
                 write!(f, "(");
                 let len = (*fields).len() - 1;
-                for (i, entry) in (*fields).iter().enumerate(){
+                for (i, entry) in (*fields).iter().enumerate() {
                     if i < len {
                         write!(f, "{}, ", entry);
                     } else {

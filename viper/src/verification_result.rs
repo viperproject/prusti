@@ -42,7 +42,7 @@ impl VerificationError {
             pos_id,
             reason_pos_id,
             message,
-            counterexample
+            counterexample,
         }
     }
 }

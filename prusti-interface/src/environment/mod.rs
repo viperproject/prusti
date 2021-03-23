@@ -122,7 +122,6 @@ impl<'tcx> Environment<'tcx> {
         if let Some(help_msg) = help {
             diagnostic.help(help_msg);
         }
-        
         for (note_msg, opt_note_sp) in notes {
             if let Some(note_sp) = opt_note_sp {
                 diagnostic.span_note(note_sp.clone(), note_msg);

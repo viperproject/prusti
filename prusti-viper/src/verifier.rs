@@ -324,17 +324,18 @@ impl<'v, 'tcx> Verifier<'v, 'tcx> {
                 debug!("Prusti error: {:?}", prusti_error);
                 
                 //counterexamples:
-                if let Some(id) = error_manager.get_def_id(&verification_error) {
-                    let counterexample = counterexample_translation::backtranslate(
-                        &self.encoder, 
-                        *id,
-                        verification_error.counterexample
-                    );
-                    if let Some(ce) = counterexample {
-                        ce.apply_prusti_error(&mut prusti_error);
+                if config::produce_counterexample() { 
+                    if let Some(id) = error_manager.get_def_id(&verification_error) {
+                        let counterexample = counterexample_translation::backtranslate(
+                            &self.encoder, 
+                            *id,
+                            verification_error.counterexample,
+                        );
+                        if let Some(ce) = counterexample {
+                            ce.annotate_error(&mut prusti_error);
+                        }
                     }
                 }
-
                 prusti_error.emit(self.env);
             }
             VerificationResult::Failure

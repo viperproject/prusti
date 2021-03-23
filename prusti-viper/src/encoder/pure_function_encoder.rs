@@ -443,7 +443,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> PureFunctionBackwardInterpreter<'p, 'v, 'tcx> {
         mir: &'p mir::Body<'tcx>,
         def_id: DefId,
         is_encoding_assertion: bool,
-        parent_def_id: DefId
+        parent_def_id: DefId,
     ) -> Self {
         PureFunctionBackwardInterpreter {
             encoder,

@@ -8,7 +8,7 @@ use viper_sys::wrappers::viper::silicon;
 use viper_sys::wrappers::scala;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SiliconCounterexample{
+pub struct SiliconCounterexample {
     //pub heap: Heap,
     //pub old_heaps: HashMap<String, Heap>,
     pub model: Model,
@@ -16,24 +16,28 @@ pub struct SiliconCounterexample{
     //label_order because HashMap's do not guarantee order of elements
     //where as the Map used in scala does guarantee it
     pub label_order: Vec<String>,
-    hash_helper: String 
+    hash_helper: String,
     //this is part of a very ugly way to make this implement Hash and Eq
 }
 
-impl SiliconCounterexample{
+impl SiliconCounterexample {
     pub fn new<'a>(
         env: &'a JNIEnv<'a>,
         jni: JniUtils<'a>,
-        counterexample: JObject<'a>
+        counterexample: JObject<'a>,
     ) -> SiliconCounterexample {
         unwrap_counterexample(env, jni, counterexample)
     }
 
-    pub fn get_entry_at_label(&self, name: &String, label: Option<&String>) -> Option<&ModelEntry>{
-        match label{
+    pub fn get_entry_at_label(
+        &self, 
+        name: &String,
+        label: Option<&String>,
+    ) -> Option<&ModelEntry> {
+        match label {
             Some(s) => {
                 let model = self.old_models.get(s);
-                match model{
+                match model {
                     Some(m) => m.entries.get(name),
                     None => None
                 }
@@ -43,8 +47,11 @@ impl SiliconCounterexample{
             }
         }
     }
-    pub fn get_entries_at_label(&self, label: Option<&String>) -> Option<HashMap<String, ModelEntry>>{
-        match label{
+    pub fn get_entries_at_label(
+        &self, 
+        label: Option<&String>,
+    ) -> Option<HashMap<String, ModelEntry>> {
+        match label {
             Some(l) => {
                 self.old_models.get(l).map(|x| x.entries.clone())
             },
@@ -55,15 +62,15 @@ impl SiliconCounterexample{
     }
 }
 
-impl PartialEq for SiliconCounterexample{
-    fn eq(&self, other: &Self) -> bool{
+impl PartialEq for SiliconCounterexample {
+    fn eq(&self, other: &Self) -> bool {
         self.hash_helper == other.hash_helper
     }
 }
 impl Eq for SiliconCounterexample{}
 
-impl Hash for SiliconCounterexample{
-    fn hash<H:Hasher>(&self, state: &mut H){
+impl Hash for SiliconCounterexample {
+    fn hash<H:Hasher>(&self, state: &mut H) {
         self.hash_helper.hash(state);
     }
 }
@@ -98,22 +105,22 @@ pub enum HeapEntry{
 
 //Model Definitions
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Model{
-    pub entries: HashMap<String, ModelEntry>
+pub struct Model {
+    pub entries: HashMap<String, ModelEntry>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum ModelEntry{
+pub enum ModelEntry {
     LitIntEntry(i64),
     LitBoolEntry(bool),
     LitPermEntry(f64),
-    RefEntry(String, HashMap<String, ModelEntry>),  //might need to add permission here
+    RefEntry(String, HashMap<String, ModelEntry>),
     NullRefEntry(String),
     RecursiveRefEntry(String),
     VarEntry(String),
     SeqEntry(String, Vec<ModelEntry>), //not necessarily supported
     OtherEntry(String, String),
-    UnprocessedModelEntry //do not use these at all
+    UnprocessedModelEntry, //do not use these at all
 }
 
 //methods unwrapping scala converter to newly defined structures:
@@ -121,9 +128,8 @@ pub enum ModelEntry{
 fn unwrap_counterexample<'a>(
     env: &'a JNIEnv<'a>, 
     jni: JniUtils<'a>, 
-    counterexample: JObject<'a>)
-    -> SiliconCounterexample
-{
+    counterexample: JObject<'a>,
+) -> SiliconCounterexample {
     let converter_wrapper = silicon::reporting::Converter::with(env);
     let ce_wrapper = silicon::interfaces::SiliconMappedCounterexample::with(env);
     //1. get converter from counterexample
@@ -171,19 +177,19 @@ fn unwrap_counterexample<'a>(
         );
     let old_models_map = jni.stringmap_to_hashmap(old_models_scala);
     let mut old_models = HashMap::new();
-    for (label, m) in old_models_map{
+    for (label, m) in old_models_map {
         let old_model = unwrap_model(env, jni, m);
         old_models.insert(label, old_model);
     }
     let hash_helper = "hashme".to_string();
     let label_order = jni.stringmap_to_keyvec(old_models_scala);
-    SiliconCounterexample{
+    SiliconCounterexample {
         //heap,
         //old_heaps,
         model,
         old_models,
         label_order,
-        hash_helper
+        hash_helper,
     }
 } 
 
@@ -193,8 +199,8 @@ fn unwrap_heap<'a>(env: &'a JNIEnv<'a>, jni: JniUtils<'a>, heap: JObject<'a>) ->
     let heap_wrapper = silicon::reporting::ExtractedHeap::with(env);
     let entries_scala = jni
         .unwrap_result(
-        heap_wrapper.call_entries(heap)
-    ); // List[HeapEntries] in scala
+            heap_wrapper.call_entries(heap)
+        ); // List[HeapEntries] in scala
     let entries_vec = jni.list_to_vec(entries_scala);
     let mut entries = vec![];
     for i in 0..(entries_vec.len()) {
@@ -254,7 +260,7 @@ fn unwrap_heap_entry<'a>(
 fn unwrap_model<'a>(
     env: &'a JNIEnv<'a>,
     jni: JniUtils<'a>,
-    model: JObject<'a>
+    model: JObject<'a>,
 ) -> Model {
     let model_wrapper = silicon::reporting::ExtractedModel::with(env);
     let entries_scala = jni.unwrap_result(model_wrapper.call_entries(model));    
@@ -264,7 +270,7 @@ fn unwrap_model<'a>(
     for (name, entry_scala) in map_string_scala {
         let entry = unwrap_model_entry(env, jni, entry_scala, &mut entries);
         match entry{
-            Some(e) => {entries.insert(name, e);},
+            Some(e) => { entries.insert(name, e); },
             None => (),
         };
     }
@@ -275,91 +281,100 @@ fn unwrap_model_entry<'a>(
     env: &'a JNIEnv<'a>,
     jni: JniUtils<'a>,
     entry: JObject<'a>,
-    entries: &mut HashMap<String, ModelEntry>
+    entries: &mut HashMap<String, ModelEntry>,
 ) -> Option<ModelEntry> {
-    // either check is_instance_of for every possible class or 
-    // get classname and match strings. First one feels saver, maybe more expensive
-    if jni.is_instance_of(entry, "viper/silicon/reporting/LitIntEntry"){
-        //one weakness: in scala value is BigInt
-        let litint_wrapper = silicon::reporting::LitIntEntry::with(env);
-        let value_scala = jni.unwrap_result(litint_wrapper.call_value(entry));
-        let value_str = jni.to_string(value_scala);
-        let value = value_str.parse::<i64>().unwrap();
-        Some(ModelEntry::LitIntEntry(value))
-    } else if jni.is_instance_of(entry, "viper/silicon/reporting/LitBoolEntry"){
-        let lit_bool_wrapper = silicon::reporting::LitBoolEntry::with(env);
-        let value = jni.unwrap_result(lit_bool_wrapper.call_value(entry));
-        Some(ModelEntry::LitBoolEntry(value))
-    } else if jni.is_instance_of(entry, "viper/silicon/reporting/LitPermEntry"){
-        let lit_perm_wrapper = silicon::reporting::LitPermEntry::with(env);
-        let value = jni.unwrap_result(lit_perm_wrapper.call_value(entry));
-        Some(ModelEntry::LitPermEntry(value))
-    } else if jni.is_instance_of(entry, "viper/silicon/reporting/RefEntry"){
-        let ref_wrapper = silicon::reporting::RefEntry::with(env);
-        let product_wrapper = scala::Product::with(env);
-        
-        let mut result = HashMap::new();
-        //get name
-        let name_scala = jni.unwrap_result(ref_wrapper.call_name(entry));
-        let fields_scala = jni.unwrap_result(ref_wrapper.call_fields(entry));
-        let name = jni.to_string(name_scala);
-        //get list of fields
-        let fields_map_scala = jni.stringmap_to_hashmap(fields_scala);
-        for (field, tuple_scala) in fields_map_scala {
-            let element_scala = jni.unwrap_result(product_wrapper.call_productElement(tuple_scala, 0));
-            let element = unwrap_model_entry(env, jni, element_scala, entries);
-            match element{
-                Some(e) => {result.insert(field, e);},
-                None => ()
+    match jni.class_name(entry).as_str() {
+        "viper.silicon.reporting.LitIntEntry" => {
+            //one weakness: in scala value is BigInt
+            let litint_wrapper = silicon::reporting::LitIntEntry::with(env);
+            let value_scala = jni.unwrap_result(litint_wrapper.call_value(entry));
+            let value_str = jni.to_string(value_scala);
+            let value = value_str.parse::<i64>().unwrap();
+            Some(ModelEntry::LitIntEntry(value))
+        },
+        "viper.silicon.reporting.LitBoolEntry" => {
+            let lit_bool_wrapper = silicon::reporting::LitBoolEntry::with(env);
+            let value = jni.unwrap_result(lit_bool_wrapper.call_value(entry));
+            Some(ModelEntry::LitBoolEntry(value))
+        },
+        "viper.silicon.reporting.LitPermEntry" => {
+            let lit_perm_wrapper = silicon::reporting::LitPermEntry::with(env);
+            let value = jni.unwrap_result(lit_perm_wrapper.call_value(entry));
+            Some(ModelEntry::LitPermEntry(value))
+        },
+        "viper.silicon.reporting.RefEntry" => {
+            let ref_wrapper = silicon::reporting::RefEntry::with(env);
+            let product_wrapper = scala::Product::with(env);
+            
+            let mut result = HashMap::new();
+            //get name
+            let name_scala = jni.unwrap_result(ref_wrapper.call_name(entry));
+            let fields_scala = jni.unwrap_result(ref_wrapper.call_fields(entry));
+            let name = jni.to_string(name_scala);
+            //get list of fields
+            let fields_map_scala = jni.stringmap_to_hashmap(fields_scala);
+            for (field, tuple_scala) in fields_map_scala {
+                let element_scala = jni.unwrap_result(product_wrapper.call_productElement(tuple_scala, 0));
+                let element = unwrap_model_entry(env, jni, element_scala, entries);
+                match element{
+                    Some(e) => {result.insert(field, e);},
+                    None => ()
+                }
             }
-        }
-        entries.insert(name.clone(), ModelEntry::RefEntry(name.clone(), result.clone()));
-        Some(ModelEntry::RefEntry(name, result))
-    } else if jni.is_instance_of(entry, "viper/silicon/reporting/NullRefEntry"){
-        let null_ref_wrapper = silicon::reporting::NullRefEntry::with(env);
-        let name = jni.to_string(
-            jni.unwrap_result(null_ref_wrapper.call_name(entry))
-        );
-        Some(ModelEntry::NullRefEntry(name))
-    } else if jni.is_instance_of(entry, "viper/silicon/reporting/RecursiveRefEntry"){
-        let rec_ref_wrapper = silicon::reporting::RecursiveRefEntry::with(env);
-        let name = jni.to_string(
-            jni.unwrap_result(rec_ref_wrapper.call_name(entry))
-        );
-        Some(ModelEntry::RecursiveRefEntry(name))
-    } else if jni.is_instance_of(entry, "viper/silicon/reporting/VarEntry"){
-        let var_wrapper = silicon::reporting::VarEntry::with(env);
-        let name = jni.to_string(
-            jni.unwrap_result(var_wrapper.call_name(entry))
-        );
-        Some(ModelEntry::VarEntry(name))
-    } else if jni.is_instance_of(entry, "viper/silicon/reporting/OtherEntry"){
-        let other_entry_wrapper = silicon::reporting::OtherEntry::with(env);
-        let value = jni.to_string(
-            jni.unwrap_result(other_entry_wrapper.call_value(entry))
-        );
-        let problem = jni.to_string(
-            jni.unwrap_result(other_entry_wrapper.call_problem(entry))
-        );
-        Some(ModelEntry::OtherEntry(value, problem))
+            entries.insert(name.clone(), ModelEntry::RefEntry(name.clone(), result.clone()));
+            Some(ModelEntry::RefEntry(name, result))
+        },
+        "viper.silicon.reporting.NullRefEntry" => {
+            let null_ref_wrapper = silicon::reporting::NullRefEntry::with(env);
+            let name = jni.to_string(
+                jni.unwrap_result(null_ref_wrapper.call_name(entry))
+            );
+            Some(ModelEntry::NullRefEntry(name))
+        },
+        "viper.silicon.reporting.RecursiveRefEntry" => {
+            let rec_ref_wrapper = silicon::reporting::RecursiveRefEntry::with(env);
+            let name = jni.to_string(
+                jni.unwrap_result(rec_ref_wrapper.call_name(entry))
+            );
+            Some(ModelEntry::RecursiveRefEntry(name))
+        },
+        "viper.silicon.reporting.VarEntry" => {
+            let var_wrapper = silicon::reporting::VarEntry::with(env);
+            let name = jni.to_string(
+                jni.unwrap_result(var_wrapper.call_name(entry))
+            );
+            Some(ModelEntry::VarEntry(name))
+        },
+        "viper.silicon.reporting.OtherEntry" => {
+            let other_entry_wrapper = silicon::reporting::OtherEntry::with(env);
+            let value = jni.to_string(
+                jni.unwrap_result(other_entry_wrapper.call_value(entry))
+            );
+            let problem = jni.to_string(
+                jni.unwrap_result(other_entry_wrapper.call_problem(entry))
+            );
+            Some(ModelEntry::OtherEntry(value, problem))
 
-    } else if jni.is_instance_of(entry, "viper/silicon/reporting/SeqEntry"){
-        let seq_entry_wrapper = silicon::reporting::SeqEntry::with(env);
-        let name = jni.to_string(
-            jni.unwrap_result(seq_entry_wrapper.call_name(entry))
-        );
-        let list_scala = jni.unwrap_result(seq_entry_wrapper.call_values(entry));
-        let vec_scala = jni.list_to_vec(list_scala);
-        let mut res = vec![];
-        for el in vec_scala{
-            let element = unwrap_model_entry(env, jni, el, entries);
-            match element {
-                Some(e) => res.push(e),
-                None => (),
+        },
+        "viper.silicon.reporting.SeqEntry" => {
+            let seq_entry_wrapper = silicon::reporting::SeqEntry::with(env);
+            let name = jni.to_string(
+                jni.unwrap_result(seq_entry_wrapper.call_name(entry))
+            );
+            let list_scala = jni.unwrap_result(seq_entry_wrapper.call_values(entry));
+            let vec_scala = jni.list_to_vec(list_scala);
+            let mut res = vec![];
+            for el in vec_scala{
+                let element = unwrap_model_entry(env, jni, el, entries);
+                match element {
+                    Some(e) => res.push(e),
+                    None => (),
+                }
             }
+            Some(ModelEntry::SeqEntry(name, res))
+        },
+        _ => {
+            None
         }
-        Some(ModelEntry::SeqEntry(name, res))
-    } else {
-        None
     }
 }

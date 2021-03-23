@@ -160,7 +160,7 @@ impl<'a> Verifier<'a, state::Started> {
         let is_failure = self
             .jni
             .is_instance_of(viper_result, "viper/silver/verifier/Failure");
-        
+
         if is_failure {
             let mut errors: Vec<VerificationError> = vec![];
 
@@ -231,7 +231,6 @@ impl<'a> Verifier<'a, state::Started> {
                     None
                 };
                 
-
                 let reason = self
                     .jni
                     .unwrap_result(verification_error_wrapper.call_reason(viper_error));
