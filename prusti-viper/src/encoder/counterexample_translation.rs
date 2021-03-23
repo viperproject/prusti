@@ -44,7 +44,7 @@ pub fn backtranslate<'tcx>(
         let last_label: Option<&String> = translator
             .silicon_counterexample
             .label_order.last();
-        let old_impure_label = "old".to_string();
+        let old_impure_label = "l0".to_string();
         let old_label = if translator.is_pure {
             None
         } else {
@@ -276,7 +276,6 @@ impl<'tcx> CounterexampleTranslator<'tcx> {
                         }
                     },
                     AdtKind::Enum => {
-                        let variants = &adt_def.variants.iter();
                         let super_name = format!("{:?}", adt_def);
                         let mut variant_name = "?".to_string();
                         let mut field_entries = vec![];
@@ -284,7 +283,7 @@ impl<'tcx> CounterexampleTranslator<'tcx> {
                             let mut variant = None;
                             let mut opt_discriminant = self.translate_int(map.get("discriminant"));
                             //need to find a discriminant to do something
-                            if !opt_discriminant.is_some(){
+                            if !opt_discriminant.is_some() {
                                 //try to find disc in the associated local variable
                                 let opt_discr_locations = self.disc_info.get(&(self.def_id, vir_name.clone()));
                                 if let Some(discr_locations) = opt_discr_locations {
@@ -301,15 +300,11 @@ impl<'tcx> CounterexampleTranslator<'tcx> {
                             if let Some(x) = opt_discriminant {
                                 let discriminant = x as u32;
                                 //is this a risk? I assume discriminant will not be too large
-                                for def in &adt_def.variants{
-                                    let discr = match def.discr {
-                                        ty::VariantDiscr::Relative(d) => d,
-                                        _ => unreachable!()  
-                                    };
-                                    if discr == discriminant {
-                                        variant = Some(def);
-                                        variant_name = def.ident.name.to_ident_string();
-                                    }
+                                variant = adt_def.variants.iter()
+                                    .filter(|x| get_discriminant_of_vardef(x) == Some(discriminant))
+                                    .next();
+                                if let Some(v) = variant {
+                                    variant_name = v.ident.name.to_ident_string();
                                 }
                             }
                             
@@ -398,5 +393,12 @@ impl<'tcx> CounterexampleTranslator<'tcx> {
             }
             _ => None
         }
+    }
+}
+
+fn get_discriminant_of_vardef(vardef: &ty::VariantDef) -> Option<u32> {
+    match vardef.discr {
+        ty::VariantDiscr::Relative(x) => Some(x),
+        _ => None
     }
 }

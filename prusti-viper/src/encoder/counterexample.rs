@@ -115,7 +115,7 @@ impl fmt::Display for Entry {
                 if length > 0 {
                     if named_fields {
                         fields_string.push_str("{");
-                        for i in 0..length{
+                        for i in 0..length {
                             let s = format!("\n{} <- {}", field_entries[i].0, field_entries[i].1);
                             fields_string.push_str(&s);
                         }
