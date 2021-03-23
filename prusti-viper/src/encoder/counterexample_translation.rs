@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::convert::TryFrom;
+use std::char;
 
 use viper::silicon_counterexample::*;
 use viper::VerificationError;
@@ -14,7 +15,7 @@ use rustc_middle::ty::{self, Ty, AdtKind, AdtDef, TyCtxt};
 use rustc_span::MultiSpan;
 
 
-pub struct Backtranslator<'tcx>{
+pub struct CounterexampleTranslator<'tcx> {
     mir: mir::Body<'tcx>,
     def_id: ProcedureDefId,
     silicon_counterexample: SiliconCounterexample,
@@ -23,39 +24,34 @@ pub struct Backtranslator<'tcx>{
     disc_info: HashMap<(ProcedureDefId, String), Vec<String>>,
 }
 
-impl<'tcx> Backtranslator<'tcx> {
+impl<'tcx> CounterexampleTranslator<'tcx> {
     pub fn new(
         encoder: &Encoder<'_, 'tcx>,
         def_id: ProcedureDefId,
-        silicon_opt_counterexample: Option<SiliconCounterexample>
-    ) -> Option<Backtranslator<'tcx>> {
-        if let Some(silicon_counterexample) = silicon_opt_counterexample {
-            let mir = encoder.env().get_procedure(def_id).get_mir().clone();
-            let tcx = encoder.env().tcx();
-            let is_pure = encoder.is_pure(def_id);
-            let disc_info = encoder.discriminants_info();
-            Some(Backtranslator{
-                mir,
-                def_id,
-                silicon_counterexample,
-                tcx,
-                is_pure,
-                disc_info,
-            })
-        } else {
-            None
+        silicon_counterexample: SiliconCounterexample
+    ) -> CounterexampleTranslator<'tcx> {
+        let mir = encoder.env().get_procedure(def_id).get_mir().clone();
+        let tcx = encoder.env().tcx();
+        let is_pure = encoder.is_pure(def_id);
+        let disc_info = encoder.discriminants_info();
+        CounterexampleTranslator {
+            mir,
+            def_id,
+            silicon_counterexample,
+            tcx,
+            is_pure,
+            disc_info,
         }
     }
 }
 
-
 pub fn backtranslate<'tcx>(
     encoder: &Encoder,
     def_id: ProcedureDefId,
-    silicon_counterexample: Option<SiliconCounterexample>,
-) -> Counterexample {
-    let opt_backtranslator = Backtranslator::new(encoder, def_id, silicon_counterexample);
-    if let Some(backtranslator) = opt_backtranslator {
+    opt_silicon_counterexample: Option<SiliconCounterexample>,
+) -> Option<Counterexample> {
+    if let Some(silicon_counterexample) = opt_silicon_counterexample {
+        let backtranslator = CounterexampleTranslator::new(encoder, def_id, silicon_counterexample);
         //get all the needed information from the mir
         let var_debug_info = backtranslator.mir.var_debug_info.clone();
         let local_variable_manager = LocalVariableManager::new(&backtranslator.mir.local_decls);
@@ -70,9 +66,7 @@ pub fn backtranslate<'tcx>(
             .label_order.last();
         //optimally this label would just be "old", but as of now mostly the values
         //are not available at this point
-        let old_label = String::from("l0");
-
-
+        let old_label = "l0".to_string();
 
         //to be processed:
         let mut args_to_process: Vec<(String, MultiSpan, String, Ty)> = vec![];
@@ -108,11 +102,11 @@ pub fn backtranslate<'tcx>(
         //make sure
         let result_to_process = if local_variable_manager.is_return(return_local){
             //open question: what would be the right span for return type? None?
-            let rust_name = String::from("result");
+            let rust_name = "result".to_string();
             let vir_name = if !backtranslator.is_pure {
                 local_variable_manager.get_name(return_local)
             } else {
-                String::from("Result()")
+                "Result()".to_string()
             };
             let typ = local_variable_manager.get_type(return_local);
             Some((rust_name, vir_name, typ))
@@ -120,12 +114,10 @@ pub fn backtranslate<'tcx>(
             //this case should probably never occur
             None
         };
-        
 
         //now map those needed:
         let mut entries = HashMap::new();
         let mut args = HashMap::new();
-
 
         let result = if !backtranslator.is_pure {
             if backtranslator.silicon_counterexample.old_models.contains_key(&old_label){ 
@@ -133,8 +125,6 @@ pub fn backtranslate<'tcx>(
                     .get(&old_label)
                     .unwrap()
                     .entries;
-                
-        
                 for (rust_name, span, vir_name, typ) in args_to_process {
                     let opt_entry = silicon_arg_entries.get(&vir_name);
                     let entry = backtranslator.backtranslate_entry(
@@ -146,7 +136,6 @@ pub fn backtranslate<'tcx>(
                     args.insert((rust_name, span), entry);
                 }
             }
-
             let silicon_final_entries = if last_label.is_some() {
                 &backtranslator.silicon_counterexample.old_models
                     .get(last_label.unwrap())
@@ -155,7 +144,6 @@ pub fn backtranslate<'tcx>(
                 } else {
                     &backtranslator.silicon_counterexample.model.entries 
                 };
-
             for (rust_name, span, vir_name, typ) in entries_to_process {
                 let opt_entry = silicon_final_entries.get(&vir_name);
                 let entry = backtranslator.backtranslate_entry(
@@ -193,7 +181,7 @@ pub fn backtranslate<'tcx>(
             match result_to_process {
                 None => Entry::Unit,
                 Some((rust_name, vir_name, typ)) => {
-                    let result_vir_name = String::from("Result()");
+                    let result_vir_name = "Result()".to_string();
                     let opt_entry = silicon_entries.get(&result_vir_name);
                     backtranslator.backtranslate_entry(
                         typ, 
@@ -204,15 +192,13 @@ pub fn backtranslate<'tcx>(
                 }
             }
         };
-        
-        Counterexample::Success {result, args, entries, is_pure: backtranslator.is_pure}
+        Some(Counterexample::new(result, args, entries, backtranslator.is_pure))
     } else {
-        Counterexample::Failure(String::from("no counterexample generated"))
+        None
     }
 }
 
-
-impl<'tcx> Backtranslator<'tcx>{
+impl<'tcx> CounterexampleTranslator<'tcx> {
     fn backtranslate_entry(
         &self,
         typ: Ty<'tcx>, 
@@ -225,7 +211,7 @@ impl<'tcx> Backtranslator<'tcx>{
                 match sil_entry{
                     Some(ModelEntry::LitBoolEntry(value)) => Entry::BoolEntry { value: *value },
                     Some(ModelEntry::RefEntry(name, map)) => {
-                        let entry = map.get(&String::from("val_bool"));
+                        let entry = map.get("val_bool");
                         if let Some(ModelEntry::LitBoolEntry(value)) = entry {
                             Entry::BoolEntry {value: *value}
                         } else {
@@ -246,16 +232,19 @@ impl<'tcx> Backtranslator<'tcx>{
             ty::TyKind::Char => {
                 let opt_value = self.backtranslate_int(sil_entry);
                 if let Some(value) = opt_value {
-                    let val_t = u8::try_from(value);
+                    let val_t = u32::try_from(value);
                     if let Ok(v) = val_t {
-                        return Entry::CharEntry{ value: v as char}
+                        let opt_char = char::from_u32(v);
+                        if let Some(chr) = opt_char {
+                            return Entry::CharEntry{ value: chr}
+                        }
                     } 
                 }
                 Entry::UnknownEntry
             },
             ty::TyKind::Ref(_, typ, _) => {
                 if let Some(ModelEntry::RefEntry(name, map)) = sil_entry {
-                    let entry = map.get(&String::from("val_ref"));
+                    let entry = map.get("val_ref");
                     let new_vir_name = format!("{}.val_ref", vir_name);
                     let rec_entry = self.backtranslate_entry(
                         typ, 
@@ -263,9 +252,9 @@ impl<'tcx> Backtranslator<'tcx>{
                         new_vir_name,
                         silicon_ce_entries, 
                     );
-                    Entry::RefEntry {el: Box::new(rec_entry)} 
+                    Entry::RefEntry {el: box rec_entry} 
                 } else {
-                    Entry::RefEntry {el: Box::new(Entry::UnknownEntry)}
+                    Entry::RefEntry {el: box Entry::UnknownEntry}
                 }
             },
             ty::TyKind::Tuple(subst) => {
@@ -275,7 +264,7 @@ impl<'tcx> Backtranslator<'tcx>{
                     if let Some(ModelEntry::RefEntry(name, map)) = sil_entry {
                         for i in 0..len{
                             let typ = subst.type_at(i);
-                            let field_id = format!("tuple_{}", i).to_string();
+                            let field_id = format!("tuple_{}", i);
                             let new_vir_name = format!("{}.{}", vir_name, field_id);
                             let field_entry = map.get(&field_id);
                             let rec_entry = self.backtranslate_entry(
@@ -319,13 +308,12 @@ impl<'tcx> Backtranslator<'tcx>{
                     AdtKind::Enum => {
                         let variants = &adt_def.variants.iter();
                         let super_name = format!("{:?}", adt_def);
-                        let mut variant_name = String::from("?");
+                        let mut variant_name = "?".to_string();
                         let mut field_names = vec![];
                         let mut field_entries = vec![];
                         if let Some(ModelEntry::RefEntry(name, map)) = sil_entry {
-                            let disc_string = String::from("discriminant");
                             let mut variant = None;
-                            let mut opt_discriminant = self.backtranslate_int(map.get(&disc_string));
+                            let mut opt_discriminant = self.backtranslate_int(map.get("discriminant"));
                             //need to find a discriminant to do something
                             if !opt_discriminant.is_some(){
                                 //try to find disc in the associated local variable
@@ -356,11 +344,8 @@ impl<'tcx> Backtranslator<'tcx>{
                                 }
                             }
                             
-                           
-
-
                             if let Some(var_def) = variant {
-                                let sil_name = format!("enum_{}", variant_name).to_string();
+                                let sil_name = format!("enum_{}", variant_name);
                                 let opt_enum_entry = map.get(&sil_name);
                                 //at this point it should be a subroutine same for structs and enum:
                                 let result = self.backtranslate_vardef(
@@ -407,7 +392,7 @@ impl<'tcx> Backtranslator<'tcx>{
             let field_name = f.ident.name.to_ident_string();
             let typ = f.ty(self.tcx, subst);
             //extract recursively:
-            let sil_name = format!("f${}", field_name).to_string();
+            let sil_name = format!("f${}", field_name);
             let new_vir_name = format!("{}.f${}", vir_name, field_name);
             let mut field_entry = Entry::UnknownEntry;
 
@@ -441,10 +426,10 @@ impl<'tcx> Backtranslator<'tcx>{
     }
 
     fn backtranslate_int(&self, opt_sil_entry: Option<&ModelEntry>) -> Option<i64> {
-        match opt_sil_entry{
+        match opt_sil_entry {
             Some(ModelEntry::LitIntEntry(value)) => Some(*value),
             Some(ModelEntry::RefEntry(name, map)) => {
-                let entry = map.get(&String::from("val_int"));
+                let entry = map.get("val_int");
                 if let Some(ModelEntry::LitIntEntry(value)) = entry {
                     Some(*value)
                 } else { 

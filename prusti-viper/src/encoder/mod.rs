@@ -33,4 +33,4 @@ mod mirror_function_encoder;
 mod purifier;
 mod array_encoder;
 pub mod counterexample;
-pub mod backtranslation;
+pub mod counterexample_translation;

@@ -3,71 +3,75 @@ use std::fmt;
 use rustc_span::MultiSpan;
 use prusti_interface::PrustiError;
 
-pub enum Counterexample {
-    Success{
+pub struct Counterexample {
+    result: Entry,
+    args: HashMap<(String, MultiSpan), Entry>,
+    entries: HashMap<(String, MultiSpan), Entry>,
+    is_pure: bool,
+}
+
+impl Counterexample {
+    pub fn new(
         result: Entry,
         args: HashMap<(String, MultiSpan), Entry>,
         entries: HashMap<(String, MultiSpan), Entry>,
         is_pure: bool,
-    },
-    Failure(String),
-}
+    ) -> Counterexample {
+        Counterexample {
+            result,
+            args,
+            entries,
+            is_pure,
+        }
+    }
 
-impl Counterexample{
     pub fn apply_prusti_error(&self, prusti_error: &mut PrustiError) {
-        if let Counterexample::Success{result, args, entries, is_pure} = self {
-            if !*is_pure {
-                for (place, entry) in entries {
-                    //place is a tuple (Name of the variable, Option<Scope>)
-                    if let Some(entry_arg) = args.get(place) {
-                        let note = format!("counterexample for \"{0}\"\ninitial: {0} <- {1}\nfinal: {0} <- {2}", 
-                            place.0, 
-                            entry_arg,  
-                            entry,
-                        );
-                        prusti_error.add_note(note, Some(place.1.clone()));
-                    } else {
-                        let note = format!("counterexample for \"{0}\"\n{0} <- {1}", place.0, entry);
-                        prusti_error.add_note(note, Some(place.1.clone()));
-                    }
-                }
-                let result_note = format!{"result <- {}", result};
-                prusti_error.add_note(result_note, None);
-            } else {
-                for (place, entry) in args {
-                    let note = format!("counterexample for \"{0}\"\n{0} <- {1}", 
-                            place.0,   
-                            entry,
-                        );
+        if !self.is_pure {
+            for (place, entry) in &self.entries {
+                //place is a tuple (Name of the variable, Option<Scope>)
+                if let Some(entry_arg) = self.args.get(place) {
+                    let note = format!("counterexample for \"{0}\"\ninitial: {0} <- {1}\nfinal: {0} <- {2}", 
+                        place.0, 
+                        entry_arg,  
+                        entry,
+                    );
+                    prusti_error.add_note(note, Some(place.1.clone()));
+                } else {
+                    let note = format!("counterexample for \"{0}\"\n{0} <- {1}", place.0, entry);
                     prusti_error.add_note(note, Some(place.1.clone()));
                 }
-                // Todo: find span of return type to give this note a span
-                let result_note = format!("result <- {}", result);
-                prusti_error.add_note(result_note, None);
             }
-        } 
+            let result_note = format!{"result <- {}", self.result};
+            prusti_error.add_note(result_note, None);
+        } else {
+            for (place, entry) in &self.args {
+                let note = format!("counterexample for \"{0}\"\n{0} <- {1}", 
+                        place.0,   
+                        entry,
+                    );
+                prusti_error.add_note(note, Some(place.1.clone()));
+            }
+            // Todo: find span of return type to give this note a span
+            let result_note = format!("result <- {}", self.result);
+            prusti_error.add_note(result_note, None);
+        }
     }
 }
 
 impl fmt::Display for Counterexample {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Counterexample::Success{result, args, entries, is_pure} => {
-                write!(f, "Counterexample:\n");
-                write!(f, "initial args:\n");
-                for (place, entry) in args {
-                    let s = format!("{} <- {}\n", place.0, entry);
-                    write!(f, "{}", indent(s));
-                }
-                write!(f, "\nlocal values when failing:\n");
-                for (place, entry) in entries {
-                    let s = format!("{} <- {}\n", place.0, entry);
-                    write!(f, "{}", indent(s));
-                }
-                write!(f, "\nresult <- {}", result)
-            },
-            _ => write!(f, "Counterexample generation failed")
+        write!(f, "Counterexample:\n");
+        write!(f, "initial args:\n");
+        for (place, entry) in &self.args {
+            let s = format!("{} <- {}\n", place.0, entry);
+            write!(f, "{}", indent(s));
         }
+        write!(f, "\nlocal values when failing:\n");
+        for (place, entry) in &self.entries {
+            let s = format!("{} <- {}\n", place.0, entry);
+            write!(f, "{}", indent(s));
+        }
+        write!(f, "\nresult <- {}", self.result)
     }
 }
 

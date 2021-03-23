@@ -24,8 +24,7 @@ pub struct PrustiError {
     message: String,
     span: MultiSpan,
     help: Option<String>,
-    note: Option<(String, MultiSpan)>,
-    additional_notes: Vec<(String, Option<MultiSpan>)>,
+    notes: Vec<(String, Option<MultiSpan>)>,
 }
 
 impl PrustiError {
@@ -36,8 +35,7 @@ impl PrustiError {
             message,
             span,
             help: None,
-            note: None,
-            additional_notes: vec![]
+            notes: vec![],
         }
     }
 
@@ -107,15 +105,14 @@ impl PrustiError {
                 self.span,
                 &self.message,
                 &self.help,
-                &self.note,
-                &self.additional_notes,
+                &self.notes,
             );
         } else {
             env.span_warn_with_help_and_note(
                 self.span,
                 &self.message,
                 &self.help,
-                &self.note,
+                &self.notes,
             );
         }
     }
@@ -125,7 +122,8 @@ impl PrustiError {
     /// Note: this is a noop if `opt_span` is None
     pub fn set_failing_assertion(mut self, opt_span: Option<&MultiSpan>) -> Self {
         if let Some(span) = opt_span {
-            self.note = Some(("the failing assertion is here".to_string(), span.clone()));
+            let note = "the failing assertion is here".to_string();
+            self.add_note(note, Some(span.clone()));
         }
         self
     }
@@ -135,14 +133,15 @@ impl PrustiError {
     /// Note: this is a noop if `opt_span` is None
     pub fn push_primary_span(mut self, opt_span: Option<&MultiSpan>) -> Self {
         if let Some(span) = opt_span {
-            self.note = Some(("the error originates here".to_string(), self.span));
+            let note = "the error originates here".to_string();
+            self.add_note(note, Some(span.clone()));
             self.span = span.clone();
         }
         self
     }
 
     pub fn add_note(&mut self, message: String, opt_span: Option<MultiSpan>) {
-        self.additional_notes.push((message, opt_span));
+        self.notes.push((message, opt_span));
     }
 }
 

@@ -431,7 +431,6 @@ pub(super) struct PureFunctionBackwardInterpreter<'p, 'v: 'p, 'tcx: 'v> {
     /// when to a undefined function calls. This distinction allows overflow checks to be checked
     /// on the caller side and assumed on the definition side.
     is_encoding_assertion: bool,
-    /// Needed for registering errors
     parent_def_id: DefId,
 }
 

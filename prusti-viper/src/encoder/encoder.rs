@@ -1445,23 +1445,13 @@ impl<'v, 'tcx> Encoder<'v, 'tcx> {
         let mut previous_entries = map.get_mut(&(proc_def_id.clone(), enum_id.clone()));
         match previous_entries {
             None => {map.insert((proc_def_id, enum_id), vec![discr_id]);},
-            Some(v) => {
-                v.push(discr_id);
-            }
+            Some(v) => v.push(discr_id),
         };
     }
 
     pub fn discriminants_info(&self) -> HashMap<(ProcedureDefId, String), Vec<String>> {
         self.discriminants_info.borrow().clone()
     }
-/*
-    pub fn get_counterexample(
-        &self, 
-        def_id: ProcedureDefId,
-        silicon_counterexample: Option<SiliconCounterexample>,
-    ) -> Counterexample {
-        backtranslate(&self, def_id, silicon_counterexample);
-    }*/
 }
 
 fn encode_identifier(ident: String) -> String {

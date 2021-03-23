@@ -9,7 +9,7 @@ use prusti_common::{
     config, report::log, verification_context::VerifierBuilder, verification_service::*, Stopwatch,
 };
 use crate::encoder::Encoder;
-use crate::encoder::backtranslation;
+use crate::encoder::counterexample_translation;
 // use prusti_filter::validators::Validator;
 use prusti_interface::data::VerificationResult;
 use prusti_interface::data::VerificationTask;
@@ -325,12 +325,14 @@ impl<'v, 'tcx> Verifier<'v, 'tcx> {
                 
                 //counterexamples:
                 if let Some(id) = error_manager.get_def_id(&verification_error) {
-                    let counterexample = backtranslation::backtranslate(
+                    let counterexample = counterexample_translation::backtranslate(
                         &self.encoder, 
                         *id,
                         verification_error.counterexample
                     );
-                    counterexample.apply_prusti_error(&mut prusti_error); 
+                    if let Some(ce) = counterexample {
+                        ce.apply_prusti_error(&mut prusti_error);
+                    }
                 }
 
                 prusti_error.emit(self.env);

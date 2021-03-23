@@ -161,14 +161,9 @@ impl<'tcx> ErrorManager<'tcx>
     }
 
     pub fn get_def_id(&self, ver_error: &VerificationError) -> Option<&ProcedureDefId> {
-        let opt_pos_id: Option<u64> = match ver_error.pos_id {
-            Some(ref viper_pos_id) => {
-                let parsed = viper_pos_id.parse();
-                parsed.ok()
-            },
-            None => None
-        };
-        opt_pos_id.and_then(|opt_pos_id| self.def_id.get(&opt_pos_id)) 
+        ver_error.pos_id.as_ref()
+            .and_then(|id| id.parse().ok())
+            .and_then(|id| self.def_id.get(&id)) 
     }
 
     pub fn translate_verification_error(&self, ver_error: &VerificationError) -> PrustiError {
