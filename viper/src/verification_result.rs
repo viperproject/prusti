@@ -26,7 +26,7 @@ pub struct VerificationError {
     pub pos_id: Option<String>,
     pub reason_pos_id: Option<String>,
     pub message: String,
-    pub counterexample: Option<SiliconCounterexample>
+    pub counterexample: Option<SiliconCounterexample>,
 }
 
 impl VerificationError {
@@ -35,7 +35,7 @@ impl VerificationError {
         pos_id: Option<String>,
         reason_pos_id: Option<String>,
         message: String,
-        counterexample: Option<SiliconCounterexample>
+        counterexample: Option<SiliconCounterexample>,
     ) -> Self {
         VerificationError {
             full_id,

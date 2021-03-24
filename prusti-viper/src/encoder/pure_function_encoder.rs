@@ -157,7 +157,9 @@ impl<'p, 'v: 'p, 'tcx: 'v> PureFunctionEncoder<'p, 'v, 'tcx> {
             None,
             true,
             None,
-            ErrorCtxt::GenericExpression)?;
+            ErrorCtxt::GenericExpression,
+            self.parent_def_id,
+        )?;
 
         self.encode_function_given_body(Some(predicate_body_encoded))
     }

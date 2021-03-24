@@ -5197,7 +5197,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                     self.encoder.add_discriminant_info(
                         enum_id,
                         encoded_lhs.to_string(), 
-                        self.proc_def_id
+                        self.proc_def_id,
                     );
                     self.encode_copy_value_assign(
                         encoded_lhs.clone(),
