@@ -136,7 +136,7 @@ impl fmt::Display for Entry {
                 } else {
                     write!(f, "")
                 }
-            }
+            },
             Entry::Struct { name, field_entries } => {
                 write!(f, "{} {{", name);
                 let len = field_entries.len();

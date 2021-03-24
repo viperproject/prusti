@@ -138,7 +138,7 @@ impl<'tcx> Environment<'tcx> {
         sp: S,
         msg: &str,
         help: &Option<String>,
-        notes: &Vec<(String, Option<S>)>
+        notes: &Vec<(String, Option<S>)>,
     ) {
         let mut diagnostic = self.tcx.sess.struct_warn(msg);
         diagnostic.set_span(sp);

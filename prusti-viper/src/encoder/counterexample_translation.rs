@@ -35,8 +35,6 @@ pub fn backtranslate<'tcx>(
 ) -> Option<Counterexample> {
     if let Some(silicon_counterexample) = opt_silicon_counterexample {
         let translator = CounterexampleTranslator::new(encoder, def_id, silicon_counterexample);
-        //get all the needed information from the mir
-
         //optimally (at a later stage) we would use the "main" counterexample 
         //from silicon, the one not associated with any label, because it contains
         //the values of the function when it fails. But currently
@@ -50,7 +48,6 @@ pub fn backtranslate<'tcx>(
         } else {
             Some(&old_impure_label)
         };
-
         //to be processed:
         let entries_to_process = translator.entries_to_process();
         let (result_sil_name, result_typ) = translator.result_to_process();
@@ -73,7 +70,6 @@ pub fn backtranslate<'tcx>(
             &result_sil_name,
             result_typ,
         );
-
         Some(Counterexample::new(result, args, entries, translator.is_pure))
     } else {
         None
@@ -106,7 +102,7 @@ impl<'tcx> CounterexampleTranslator<'tcx> {
 
     fn entries_to_process(&self) -> Vec<(String, MultiSpan, String, Ty<'tcx>, bool)> {
         let mut entries_to_process = vec![];
-        for vdi in &self.var_debug_info{
+        for vdi in &self.var_debug_info {
             let rust_name = vdi.name.to_ident_string();
             let span = vdi.source_info.span;
             let multi_span = MultiSpan::from_span(span);
@@ -134,7 +130,7 @@ impl<'tcx> CounterexampleTranslator<'tcx> {
         // other than for entries, this is not always same as the vir-name
         let return_local = Local::from(mir::Local::from_usize(0));
 
-        if self.local_variable_manager.is_return(return_local){
+        if self.local_variable_manager.is_return(return_local) {
             //open question: what would be the right span for return type? None?
             let vir_name = if !self.is_pure {
                 self.local_variable_manager.get_name(return_local)
@@ -166,7 +162,7 @@ impl<'tcx> CounterexampleTranslator<'tcx> {
             typ,
             opt_sil_entry,
             var_name.to_string(),
-            silicon_model
+            silicon_model,
         )
     }
     
@@ -179,7 +175,7 @@ impl<'tcx> CounterexampleTranslator<'tcx> {
     ) -> Entry {
         match typ.kind(){
             ty::TyKind::Bool => {
-                match sil_entry{
+                match sil_entry {
                     Some(ModelEntry::LitBoolEntry(value)) => Entry::BoolEntry { value: *value },
                     Some(ModelEntry::RefEntry(name, map)) => {
                         let entry = map.get("val_bool");
@@ -207,7 +203,7 @@ impl<'tcx> CounterexampleTranslator<'tcx> {
                     if let Ok(v) = val_t {
                         let opt_char = char::from_u32(v);
                         if let Some(chr) = opt_char {
-                            return Entry::CharEntry{ value: chr}
+                            return Entry::CharEntry{ value: chr }
                         }
                     } 
                 }
@@ -223,9 +219,9 @@ impl<'tcx> CounterexampleTranslator<'tcx> {
                         new_vir_name,
                         silicon_ce_entries, 
                     );
-                    Entry::RefEntry {el: box rec_entry} 
+                    Entry::RefEntry { el: box rec_entry } 
                 } else {
-                    Entry::RefEntry {el: box Entry::UnknownEntry}
+                    Entry::RefEntry { el: box Entry::UnknownEntry }
                 }
             },
             ty::TyKind::Tuple(subst) => {
@@ -233,7 +229,7 @@ impl<'tcx> CounterexampleTranslator<'tcx> {
                 if len > 0 {
                     let mut fields = vec![];
                     if let Some(ModelEntry::RefEntry(name, map)) = sil_entry {
-                        for i in 0..len{
+                        for i in 0..len {
                             let typ = subst.type_at(i);
                             let field_id = format!("tuple_{}", i);
                             let new_vir_name = format!("{}.{}", vir_name, field_id);
@@ -246,7 +242,7 @@ impl<'tcx> CounterexampleTranslator<'tcx> {
                             );
                             fields.push(rec_entry);
                         }
-                        Entry::Tuple{fields}
+                        Entry::Tuple{ fields }
                     } else {
                         Entry::UnknownEntry
                     }
@@ -272,7 +268,7 @@ impl<'tcx> CounterexampleTranslator<'tcx> {
                         );
                         Entry::Struct{
                             name: struct_name,
-                            field_entries
+                            field_entries,
                         }
                     },
                     AdtKind::Enum => {
@@ -329,7 +325,7 @@ impl<'tcx> CounterexampleTranslator<'tcx> {
                         }
                     },
                         //afaik unions are not supported
-                    _ => unreachable!()
+                    _ => unreachable!(),
                 }
             },
             _ => Entry::UnknownEntry
@@ -390,8 +386,8 @@ impl<'tcx> CounterexampleTranslator<'tcx> {
                 } else { 
                     None
                 }
-            }
-            _ => None
+            },
+            _ => None,
         }
     }
 }
@@ -399,6 +395,6 @@ impl<'tcx> CounterexampleTranslator<'tcx> {
 fn get_discriminant_of_vardef(vardef: &ty::VariantDef) -> Option<u32> {
     match vardef.discr {
         ty::VariantDiscr::Relative(x) => Some(x),
-        _ => None
+        _ => None,
     }
 }
