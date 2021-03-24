@@ -5,6 +5,7 @@ use prusti_interface::PrustiError;
 
 pub struct Counterexample {
     result: Entry,
+    result_span: Option<MultiSpan>,
     args: HashMap<(String, MultiSpan), Entry>,
     entries: HashMap<(String, MultiSpan), Entry>,
     is_pure: bool,
@@ -13,12 +14,14 @@ pub struct Counterexample {
 impl Counterexample {
     pub fn new(
         result: Entry,
+        result_span: Option<MultiSpan>,
         args: HashMap<(String, MultiSpan), Entry>,
         entries: HashMap<(String, MultiSpan), Entry>,
         is_pure: bool,
     ) -> Counterexample {
         Counterexample {
             result,
+            result_span,
             args,
             entries,
             is_pure,
@@ -42,7 +45,7 @@ impl Counterexample {
                 }
             }
             let result_note = format!("result <- {}", self.result);
-            prusti_error.add_note(result_note, None);
+            prusti_error.add_note(result_note, self.result_span.clone());
         } else {
             for (place, entry) in &self.args {
                 let note = format!("counterexample for \"{0}\"\n{0} <- {1}", 

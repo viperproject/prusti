@@ -70,7 +70,9 @@ pub fn backtranslate<'tcx>(
             &result_sil_name,
             result_typ,
         );
-        Some(Counterexample::new(result, args, entries, translator.is_pure))
+        let result_span = translator.result_span();
+
+        Some(Counterexample::new(result, result_span, args, entries, translator.is_pure))
     } else {
         None
     }
@@ -143,6 +145,14 @@ impl<'tcx> CounterexampleTranslator<'tcx> {
             //this case should probably never occur
             unreachable!(); 
         }
+    }
+
+    fn result_span(&self) -> Option<MultiSpan> {
+        //figure out span of result
+        let hir = self.tcx.hir();
+        let hir_id = hir.local_def_id_to_hir_id(self.def_id.as_local().unwrap());
+        let result_span = hir.fn_decl_by_hir_id(hir_id).and_then(|x| Some(x.output.span()));
+        result_span.map(|x| MultiSpan::from(x))
     }
 
     fn process_variable_at_label(
