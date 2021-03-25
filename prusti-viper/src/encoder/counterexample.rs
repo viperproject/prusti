@@ -33,29 +33,29 @@ impl Counterexample {
             for (place, entry) in &self.entries {
                 //place is a tuple (Name of the variable, Option<Scope>)
                 if let Some(entry_arg) = self.args.get(place) {
-                    let note = format!("counterexample for \"{0}\"\ninitial: {0} <- {1}\nfinal: {0} <- {2}", 
+                    let note = format!("counterexample for \"{0}\"\ninitial: {0} <- {1:#?}\nfinal: {0} <- {2:#?}", 
                         place.0, 
                         entry_arg,  
                         entry,
                     );
                     prusti_error.add_note(note, Some(place.1.clone()));
                 } else {
-                    let note = format!("counterexample for \"{0}\"\n{0} <- {1}", place.0, entry);
+                    let note = format!("counterexample for \"{0}\"\n{0} <- {1:#?}", place.0, entry);
                     prusti_error.add_note(note, Some(place.1.clone()));
                 }
             }
-            let result_note = format!("result <- {}", self.result);
+            let result_note = format!("result <- {:#?}", self.result);
             prusti_error.add_note(result_note, self.result_span.clone());
         } else {
             for (place, entry) in &self.args {
-                let note = format!("counterexample for \"{0}\"\n{0} <- {1}", 
+                let note = format!("counterexample for \"{0}\"\n{0} <- {1:#?}", 
                         place.0,   
                         entry,
                     );
                 prusti_error.add_note(note, Some(place.1.clone()));
             }
             // Todo: find span of return type to give this note a span
-            let result_note = format!("result <- {}", self.result);
+            let result_note = format!("result <- {:#?}", self.result);
             prusti_error.add_note(result_note, None);
         }
     }
@@ -66,19 +66,18 @@ impl fmt::Display for Counterexample {
         write!(f, "Counterexample:\n");
         write!(f, "initial args:\n");
         for (place, entry) in &self.args {
-            let s = format!("{} <- {}\n", place.0, entry);
+            let s = format!("{} <- {:?}\n", place.0, entry);
             write!(f, "{}", indent(s));
         }
         write!(f, "\nlocal values when failing:\n");
         for (place, entry) in &self.entries {
-            let s = format!("{} <- {}\n", place.0, entry);
+            let s = format!("{} <- {:?}\n", place.0, entry);
             write!(f, "{}", indent(s));
         }
-        write!(f, "\nresult <- {}", self.result)
+        write!(f, "\nresult <- {:#?}", self.result)
     }
 }
 
-#[derive(Debug)]
 pub enum Entry {
     IntEntry { value: i64 },
     BoolEntry { value: bool },
@@ -102,68 +101,47 @@ pub enum Entry {
     UnknownEntry,
 }
 
-impl fmt::Display for Entry {
+impl fmt::Debug for Entry {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Entry::IntEntry { value } => write!(f, "{}", value),
             Entry::BoolEntry { value } => write!(f, "{}", value),
             Entry::CharEntry { value } => write!(f, "'{}' ({:x})", value, *value as i32),
-            Entry::RefEntry { el } => write!(f, "ref({})", indent(el.to_string())),
+            Entry::RefEntry { el } => write!(f, "ref({:#?})", el),
             Entry::Enum { super_name, name, field_entries } => {
-                write!(f, "{}::{}", super_name, name);
-                let length = field_entries.len();
-                let mut fields_string = "".to_owned();
                 let named_fields = field_entries.len() > 0 && !field_entries[0].0.parse::<usize>().is_ok();
-
-                if length > 0 {
-                    if named_fields {
-                        fields_string.push_str("{");
-                        for i in 0..length {
-                            let s = format!("\n{} <- {}", field_entries[i].0, field_entries[i].1);
-                            fields_string.push_str(&s);
-                        }
-                        write!(f, "{}", indent(fields_string));
-                        write!(f, "}}")
-                    } else {
-                        write!(f, "(");
-                        let len = length - 1;
-                        for (i, entry) in (*field_entries).iter().enumerate(){
-                            if i < len {
-                                write!(f, "{}, ", entry.1);
-                            } else {
-                                write!(f, "{}", entry.1);
-                            }
-                        }
-                        write!(f, ")")
+                let enum_name = format!("{}::{}", super_name, name);
+                if named_fields {
+                    let mut f1 = f.debug_struct(&enum_name);
+                    for (fieldname, entry) in field_entries {
+                        f1.field(fieldname, entry);
                     }
+                    return f1.finish();
                 } else {
-                    write!(f, "")
+                    let mut f1 = f.debug_tuple(&enum_name);
+                    for (_, entry) in field_entries {
+                        f1.field(entry);
+                    }
+                    return f1.finish();
                 }
             },
             Entry::Struct { name, field_entries } => {
-                write!(f, "{} {{", name);
-                let len = field_entries.len();
-                let mut fields_str = "".to_owned();
-                for i in 0..len{
-                    let s = format!("\n{} <- {}", field_entries[i].0, field_entries[i].1);
-                    fields_str.push_str(&s);
+                let mut f1 = f.debug_struct(name);
+                for (fieldname, entry) in field_entries {
+                    f1.field(fieldname, entry);
                 }
-                write!(f, "{}}}\n", indent(fields_str))
+                f1.finish()
+
             },
             Entry::Tuple { fields } => {
-                write!(f, "(");
-                let len = (*fields).len() - 1;
-                for (i, entry) in (*fields).iter().enumerate() {
-                    if i < len {
-                        write!(f, "{}, ", entry);
-                    } else {
-                        write!(f, "{}", entry);
-                    }
+                let mut f1 = f.debug_tuple("");
+                for entry in fields {
+                    f1.field(entry);
                 }
-                write!(f, ")")
+                f1.finish()
             },
             Entry::Unit => write!(f, "()"),
-            _ => write!(f, "?")
+            _ => write!(f, "?"),
         }
     }
 }
