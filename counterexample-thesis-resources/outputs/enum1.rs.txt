@@ -1,0 +1,71 @@
+  __          __        __  ___             
+ |__)  _\/_  |__) |  | /__`  |   ____\/_  | 
+ |      /\   |  \ \__/ .__/  |       /\   | 
+
+
+warning: unused variable: `b`
+  --> counterexample-thesis-resources/cetests/enums/enum1.rs:14:23
+   |
+14 |         Choose::Three(b) => true
+   |                       ^ help: if this is intentional, prefix it with an underscore: `_b`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+warning: function is never used: `foo`
+  --> counterexample-thesis-resources/cetests/enums/enum1.rs:10:4
+   |
+10 | fn foo(x:Choose) -> bool {
+   |    ^^^
+   |
+   = note: `#[warn(dead_code)]` on by default
+
+Verification of 2 items...
+SLF4J: Class path contains multiple SLF4J bindings.
+SLF4J: Found binding in [jar:file:/home/cedric/prusti-dev/viper_tools/backends/silicon.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: Found binding in [jar:file:/home/cedric/prusti-dev/viper_tools/backends/ch.qos.logback.logback-classic-1.2.3.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: See http://www.slf4j.org/codes.html#multiple_bindings for an explanation.
+SLF4J: Actual binding is of type [ch.qos.logback.classic.util.ContextSelectorStaticBinder]
+error: [Prusti: verification error] postcondition might not hold.
+  --> counterexample-thesis-resources/cetests/enums/enum1.rs:10:1
+   |
+10 | / fn foo(x:Choose) -> bool {
+11 | |     match x {
+12 | |         Choose::One => true,
+13 | |         Choose::Two(x) => x > -3,
+14 | |         Choose::Three(b) => true
+15 | |     }
+16 | | }
+   | |_^
+   |
+note: counterexample for "x"
+x <- -55
+  --> counterexample-thesis-resources/cetests/enums/enum1.rs:13:21
+   |
+13 |         Choose::Two(x) => x > -3,
+   |                     ^
+note: counterexample for "b"
+b <- false
+  --> counterexample-thesis-resources/cetests/enums/enum1.rs:14:23
+   |
+14 |         Choose::Three(b) => true
+   |                       ^
+note: counterexample for "x"
+initial: x <- Choose::Two(
+    ?,
+)
+final: x <- Choose::Two(
+    ?,
+)
+  --> counterexample-thesis-resources/cetests/enums/enum1.rs:10:8
+   |
+10 | fn foo(x:Choose) -> bool {
+   |        ^
+note: result <- false
+  --> counterexample-thesis-resources/cetests/enums/enum1.rs:10:21
+   |
+10 | fn foo(x:Choose) -> bool {
+   |                     ^^^^
+
+Verification failed
+error: aborting due to previous error; 2 warnings emitted
+

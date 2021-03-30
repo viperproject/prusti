@@ -1,0 +1,196 @@
+  __          __        __  ___             
+ |__)  _\/_  |__) |  | /__`  |   ____\/_  | 
+ |      /\   |  \ \__/ .__/  |       /\   | 
+
+
+warning: unreachable pattern
+  --> counterexample-thesis-resources/cetests/enums/enum3.rs:53:9
+   |
+53 |         _ => true
+   |         ^
+   |
+   = note: `#[warn(unreachable_patterns)]` on by default
+
+warning: unused variable: `y`
+  --> counterexample-thesis-resources/cetests/enums/enum3.rs:41:24
+   |
+41 |         OtherEnum::One(y) => true,
+   |                        ^ help: if this is intentional, prefix it with an underscore: `_y`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+warning: field is never read: `a`
+ --> counterexample-thesis-resources/cetests/enums/enum3.rs:4:5
+  |
+4 |     a: SomeEnum,
+  |     ^^^^^^^^^^^
+  |
+  = note: `#[warn(dead_code)]` on by default
+
+warning: field is never read: `b`
+ --> counterexample-thesis-resources/cetests/enums/enum3.rs:5:5
+  |
+5 |     b: SomeEnum,
+  |     ^^^^^^^^^^^
+
+warning: variant is never constructed: `One`
+ --> counterexample-thesis-resources/cetests/enums/enum3.rs:8:16
+  |
+8 | enum SomeEnum{ One, Two, Three }
+  |                ^^^
+
+warning: variant is never constructed: `Two`
+ --> counterexample-thesis-resources/cetests/enums/enum3.rs:8:21
+  |
+8 | enum SomeEnum{ One, Two, Three }
+  |                     ^^^
+
+warning: variant is never constructed: `Three`
+ --> counterexample-thesis-resources/cetests/enums/enum3.rs:8:26
+  |
+8 | enum SomeEnum{ One, Two, Three }
+  |                          ^^^^^
+
+warning: variant is never constructed: `One`
+  --> counterexample-thesis-resources/cetests/enums/enum3.rs:11:5
+   |
+11 |     One(SomeEnum),
+   |     ^^^^^^^^^^^^^
+
+warning: variant is never constructed: `Two`
+  --> counterexample-thesis-resources/cetests/enums/enum3.rs:12:5
+   |
+12 |     Two(SomeEnum, SomeEnum)
+   |     ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function is never used: `foo`
+  --> counterexample-thesis-resources/cetests/enums/enum3.rs:18:4
+   |
+18 | fn foo(x: SomeStruct) -> bool {
+   |    ^^^
+
+warning: function is never used: `bar`
+  --> counterexample-thesis-resources/cetests/enums/enum3.rs:31:4
+   |
+31 | fn bar(x: &SomeEnum) -> bool {
+   |    ^^^
+
+warning: function is never used: `baz`
+  --> counterexample-thesis-resources/cetests/enums/enum3.rs:39:4
+   |
+39 | fn baz(x: OtherEnum) -> bool {
+   |    ^^^
+
+Verification of 4 items...
+SLF4J: Class path contains multiple SLF4J bindings.
+SLF4J: Found binding in [jar:file:/home/cedric/prusti-dev/viper_tools/backends/silicon.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: Found binding in [jar:file:/home/cedric/prusti-dev/viper_tools/backends/ch.qos.logback.logback-classic-1.2.3.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: See http://www.slf4j.org/codes.html#multiple_bindings for an explanation.
+SLF4J: Actual binding is of type [ch.qos.logback.classic.util.ContextSelectorStaticBinder]
+error: [Prusti: verification error] postcondition might not hold.
+  --> counterexample-thesis-resources/cetests/enums/enum3.rs:18:1
+   |
+18 | / fn foo(x: SomeStruct) -> bool {
+19 | |     match x.a{
+20 | |         SomeEnum::One => {
+21 | |             match x.b {
+...  |
+27 | |     }
+28 | | }
+   | |_^
+   |
+note: counterexample for "x"
+initial: x <- SomeStruct {
+    a: SomeEnum::?,
+    b: SomeEnum::?,
+}
+final: x <- SomeStruct {
+    a: SomeEnum::One,
+    b: SomeEnum::Two,
+}
+  --> counterexample-thesis-resources/cetests/enums/enum3.rs:18:8
+   |
+18 | fn foo(x: SomeStruct) -> bool {
+   |        ^
+note: result <- false
+  --> counterexample-thesis-resources/cetests/enums/enum3.rs:18:26
+   |
+18 | fn foo(x: SomeStruct) -> bool {
+   |                          ^^^^
+
+error: [Prusti: verification error] postcondition might not hold.
+  --> counterexample-thesis-resources/cetests/enums/enum3.rs:31:1
+   |
+31 | / fn bar(x: &SomeEnum) -> bool {
+32 | |     match *x {
+33 | |         SomeEnum::One => false,
+34 | |         _ => true
+35 | |     }
+36 | | }
+   | |_^
+   |
+note: counterexample for "x"
+initial: x <- ref(SomeEnum::?)
+final: x <- ref(SomeEnum::One)
+  --> counterexample-thesis-resources/cetests/enums/enum3.rs:31:8
+   |
+31 | fn bar(x: &SomeEnum) -> bool {
+   |        ^
+note: result <- false
+  --> counterexample-thesis-resources/cetests/enums/enum3.rs:31:25
+   |
+31 | fn bar(x: &SomeEnum) -> bool {
+   |                         ^^^^
+
+error: [Prusti: verification error] postcondition might not hold.
+  --> counterexample-thesis-resources/cetests/enums/enum3.rs:39:1
+   |
+39 | / fn baz(x: OtherEnum) -> bool {
+40 | |     match x {
+41 | |         OtherEnum::One(y) => true,
+42 | |         OtherEnum::Two(a,b) => {
+...  |
+54 | |     }
+55 | | }
+   | |_^
+   |
+note: counterexample for "x"
+initial: x <- OtherEnum::Two(
+    ?,
+    ?,
+)
+final: x <- OtherEnum::Two(
+    SomeEnum::?,
+    SomeEnum::?,
+)
+  --> counterexample-thesis-resources/cetests/enums/enum3.rs:39:8
+   |
+39 | fn baz(x: OtherEnum) -> bool {
+   |        ^
+note: counterexample for "a"
+a <- SomeEnum::One
+  --> counterexample-thesis-resources/cetests/enums/enum3.rs:42:24
+   |
+42 |         OtherEnum::Two(a,b) => {
+   |                        ^
+note: counterexample for "b"
+b <- SomeEnum::Two
+  --> counterexample-thesis-resources/cetests/enums/enum3.rs:42:26
+   |
+42 |         OtherEnum::Two(a,b) => {
+   |                          ^
+note: counterexample for "y"
+y <- SomeEnum::?
+  --> counterexample-thesis-resources/cetests/enums/enum3.rs:41:24
+   |
+41 |         OtherEnum::One(y) => true,
+   |                        ^
+note: result <- false
+  --> counterexample-thesis-resources/cetests/enums/enum3.rs:39:25
+   |
+39 | fn baz(x: OtherEnum) -> bool {
+   |                         ^^^^
+
+Verification failed
+error: aborting due to 3 previous errors; 12 warnings emitted
+

@@ -1,22 +1,22 @@
 use std::collections::HashMap;
 use std::fmt;
-use rustc_span::MultiSpan;
+use rustc_span::Span;
 use prusti_interface::PrustiError;
 
 pub struct Counterexample {
     result: Entry,
-    result_span: Option<MultiSpan>,
-    args: HashMap<(String, MultiSpan), Entry>,
-    entries: HashMap<(String, MultiSpan), Entry>,
+    result_span: Option<Span>,
+    args: HashMap<(String, Span), Entry>,
+    entries: HashMap<(String, Span), Entry>,
     is_pure: bool,
 }
 
 impl Counterexample {
     pub fn new(
         result: Entry,
-        result_span: Option<MultiSpan>,
-        args: HashMap<(String, MultiSpan), Entry>,
-        entries: HashMap<(String, MultiSpan), Entry>,
+        result_span: Option<Span>,
+        args: HashMap<(String, Span), Entry>,
+        entries: HashMap<(String, Span), Entry>,
         is_pure: bool,
     ) -> Counterexample {
         Counterexample {
@@ -28,7 +28,7 @@ impl Counterexample {
         }
     }
 
-    pub fn annotate_error(&self, prusti_error: &mut PrustiError) {
+    pub fn annotate_error(&self, mut prusti_error: PrustiError) -> PrustiError {
         if !self.is_pure {
             for (place, entry) in &self.entries {
                 //place is a tuple (Name of the variable, Option<Scope>)
@@ -38,26 +38,27 @@ impl Counterexample {
                         entry_arg,  
                         entry,
                     );
-                    prusti_error.add_note(note, Some(place.1.clone()));
+                    prusti_error = prusti_error.add_note(&note, Some(place.1.clone()));
                 } else {
                     let note = format!("counterexample for \"{0}\"\n{0} <- {1:#?}", place.0, entry);
-                    prusti_error.add_note(note, Some(place.1.clone()));
+                    prusti_error = prusti_error.add_note(&note, Some(place.1.clone()));
                 }
             }
             let result_note = format!("result <- {:#?}", self.result);
-            prusti_error.add_note(result_note, self.result_span.clone());
+            prusti_error = prusti_error.add_note(&result_note, self.result_span.clone());
         } else {
             for (place, entry) in &self.args {
                 let note = format!("counterexample for \"{0}\"\n{0} <- {1:#?}", 
                         place.0,   
                         entry,
                     );
-                prusti_error.add_note(note, Some(place.1.clone()));
+                prusti_error = prusti_error.add_note(&note, Some(place.1.clone()));
             }
             // Todo: find span of return type to give this note a span
             let result_note = format!("result <- {:#?}", self.result);
-            prusti_error.add_note(result_note, None);
+            prusti_error = prusti_error.add_note(&result_note, None);
         }
+        prusti_error
     }
 }
 

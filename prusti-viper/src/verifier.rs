@@ -332,7 +332,7 @@ impl<'v, 'tcx> Verifier<'v, 'tcx> {
                             verification_error.counterexample,
                         );
                         if let Some(ce) = counterexample {
-                            ce.annotate_error(&mut prusti_error);
+                            prusti_error = ce.annotate_error(prusti_error);
                         }
                     }
                 }

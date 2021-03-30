@@ -93,8 +93,8 @@ impl PrustiError {
         self
     }
 
-    pub fn set_note<S: ToString>(mut self, note: S, note_span: Span) -> Self {
-        self.note = Some((note.to_string(), MultiSpan::from_span(note_span)));
+    pub fn add_note<S: ToString>(mut self, message: S, opt_span: Option<Span>) -> Self{
+        self.notes.push((message.to_string(), opt_span.map(|x| MultiSpan::from(x))));
         self
     }
 
@@ -123,7 +123,7 @@ impl PrustiError {
     pub fn set_failing_assertion(mut self, opt_span: Option<&MultiSpan>) -> Self {
         if let Some(span) = opt_span {
             let note = "the failing assertion is here".to_string();
-            self.add_note(note, Some(span.clone()));
+            self.notes.push((note, Some(span.clone())));
         }
         self
     }
@@ -133,15 +133,10 @@ impl PrustiError {
     /// Note: this is a noop if `opt_span` is None
     pub fn push_primary_span(mut self, opt_span: Option<&MultiSpan>) -> Self {
         if let Some(span) = opt_span {
-            let note = "the error originates here".to_string();
-            self.add_note(note, Some(span.clone()));
+            self.notes.push(("the error originates here".to_string(), Some(span.clone())));
             self.span = span.clone();
         }
         self
-    }
-
-    pub fn add_note(&mut self, message: String, opt_span: Option<MultiSpan>) {
-        self.notes.push((message, opt_span));
     }
 }
 

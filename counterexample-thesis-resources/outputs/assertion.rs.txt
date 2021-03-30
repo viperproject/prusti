@@ -1,0 +1,45 @@
+  __          __        __  ___             
+ |__)  _\/_  |__) |  | /__`  |   ____\/_  | 
+ |      /\   |  \ \__/ .__/  |       /\   | 
+
+
+warning: unused variable: `y`
+  --> counterexample-thesis-resources/cetests/incorrect_def_ids/assertion.rs:15:9
+   |
+15 |     let y = sum(-3);
+   |         ^ help: if this is intentional, prefix it with an underscore: `_y`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+Verification of 2 items...
+SLF4J: Class path contains multiple SLF4J bindings.
+SLF4J: Found binding in [jar:file:/home/cedric/prusti-dev/viper_tools/backends/silicon.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: Found binding in [jar:file:/home/cedric/prusti-dev/viper_tools/backends/ch.qos.logback.logback-classic-1.2.3.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: See http://www.slf4j.org/codes.html#multiple_bindings for an explanation.
+SLF4J: Actual binding is of type [ch.qos.logback.classic.util.ContextSelectorStaticBinder]
+error: [Prusti: verification error] precondition of pure function call might not hold.
+  --> counterexample-thesis-resources/cetests/incorrect_def_ids/assertion.rs:15:13
+   |
+15 |     let y = sum(-3);
+   |             ^^^^^^^
+   |
+note: the failing assertion is here
+  --> counterexample-thesis-resources/cetests/incorrect_def_ids/assertion.rs:4:12
+   |
+4  | #[requires(x>=0)]
+   |            ^^^^
+note: counterexample for "y"
+y <- ?
+  --> counterexample-thesis-resources/cetests/incorrect_def_ids/assertion.rs:15:9
+   |
+15 |     let y = sum(-3);
+   |         ^
+note: result <- ()
+  --> counterexample-thesis-resources/cetests/incorrect_def_ids/assertion.rs:14:10
+   |
+14 | fn main(){
+   |          ^
+
+Verification failed
+error: aborting due to previous error; 1 warning emitted
+

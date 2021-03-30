@@ -12,7 +12,7 @@ use crate::encoder::counterexample::*;
 
 use rustc_middle::mir::{self, VarDebugInfo};
 use rustc_middle::ty::{self, Ty, AdtKind, AdtDef, TyCtxt};
-use rustc_span::MultiSpan;
+use rustc_span::Span;
 
 
 pub struct CounterexampleTranslator<'tcx> {
@@ -102,12 +102,11 @@ impl<'tcx> CounterexampleTranslator<'tcx> {
         }
     }
 
-    fn entries_to_process(&self) -> Vec<(String, MultiSpan, String, Ty<'tcx>, bool)> {
+    fn entries_to_process(&self) -> Vec<(String, Span, String, Ty<'tcx>, bool)> {
         let mut entries_to_process = vec![];
         for vdi in &self.var_debug_info {
             let rust_name = vdi.name.to_ident_string();
             let span = vdi.source_info.span;
-            let multi_span = MultiSpan::from_span(span);
             let local: mir::Local = if let mir::VarDebugInfoContents::Place(place) = vdi.value {
                 if let Some(local) = place.as_local() {
                     local
@@ -122,7 +121,7 @@ impl<'tcx> CounterexampleTranslator<'tcx> {
             let typ = self.local_variable_manager.get_type(var_local);
             let is_arg = index > 0 && index <= self.mir.arg_count;
             let vir_name = self.local_variable_manager.get_name(var_local);
-            entries_to_process.push((rust_name.clone(), multi_span.clone(), vir_name.clone(), typ, is_arg));
+            entries_to_process.push((rust_name.clone(), span.clone(), vir_name.clone(), typ, is_arg));
         }
         entries_to_process
     }
@@ -147,12 +146,11 @@ impl<'tcx> CounterexampleTranslator<'tcx> {
         }
     }
 
-    fn result_span(&self) -> Option<MultiSpan> {
+    fn result_span(&self) -> Option<Span> {
         //figure out span of result
         let hir = self.tcx.hir();
         let hir_id = hir.local_def_id_to_hir_id(self.def_id.as_local().unwrap());
-        let result_span = hir.fn_decl_by_hir_id(hir_id).and_then(|x| Some(x.output.span()));
-        result_span.map(|x| MultiSpan::from(x))
+        hir.fn_decl_by_hir_id(hir_id).and_then(|x| Some(x.output.span()))
     }
 
     fn process_variable_at_label(

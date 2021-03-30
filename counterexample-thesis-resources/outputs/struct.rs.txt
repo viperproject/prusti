@@ -1,0 +1,50 @@
+  __          __        __  ___             
+ |__)  _\/_  |__) |  | /__`  |   ____\/_  | 
+ |      /\   |  \ \__/ .__/  |       /\   | 
+
+
+Verification of 2 items...
+SLF4J: Class path contains multiple SLF4J bindings.
+SLF4J: Found binding in [jar:file:/home/cedric/prusti-dev/viper_tools/backends/silicon.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: Found binding in [jar:file:/home/cedric/prusti-dev/viper_tools/backends/ch.qos.logback.logback-classic-1.2.3.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: See http://www.slf4j.org/codes.html#multiple_bindings for an explanation.
+SLF4J: Actual binding is of type [ch.qos.logback.classic.util.ContextSelectorStaticBinder]
+error: [Prusti: verification error] postcondition might not hold.
+  --> counterexample-thesis-resources/cetests/./struct.rs:13:11
+   |
+13 | #[ensures(result.value!=42)]
+   |           ^^^^^^^^^^^^^^^^
+   |
+note: the error originates here
+  --> counterexample-thesis-resources/cetests/./struct.rs:13:11
+   |
+13 | #[ensures(result.value!=42)]
+   |           ^^^^^^^^^^^^^^^^
+note: counterexample for "x"
+initial: x <- Whatever {
+    value: ?,
+    other_value: ?,
+    valid: ?,
+}
+final: x <- Whatever {
+    value: ?,
+    other_value: ?,
+    valid: true,
+}
+  --> counterexample-thesis-resources/cetests/./struct.rs:14:12
+   |
+14 | pub fn foo(x: Whatever) -> Whatever {
+   |            ^
+note: result <- Whatever {
+    value: 42,
+    other_value: 43,
+    valid: false,
+}
+  --> counterexample-thesis-resources/cetests/./struct.rs:14:28
+   |
+14 | pub fn foo(x: Whatever) -> Whatever {
+   |                            ^^^^^^^^
+
+Verification failed
+error: aborting due to previous error
+
