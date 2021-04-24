@@ -22,6 +22,8 @@ extern crate serde;
 extern crate uuid;
 extern crate viper;
 
+extern crate prusti_utils;
+
 pub mod config;
 pub mod report;
 mod stopwatch;

@@ -14,6 +14,7 @@ use super::super::super::cfg;
 use config;
 use std::collections::{HashMap, HashSet};
 use std::{self, mem};
+use prusti_utils::force_matches;
 
 /// Purify vars.
 pub fn purify_vars(mut method: cfg::CfgMethod) -> cfg::CfgMethod {
@@ -262,16 +263,14 @@ impl VarPurifier {
         }
     }
     fn get_replacement(&self, expr: &ast::Expr) -> ast::Expr {
-        if let ast::Expr::Local(var, pos) = expr {
+        force_matches!(expr, ast::Expr::Local(var, pos) => {
             let replacement = self
                 .replacements
                 .get(&var)
                 .expect(&format!("key: {}", var))
                 .clone();
             ast::Expr::Local(replacement, *pos)
-        } else {
-            unreachable!()
-        }
+        })
     }
     fn get_replacement_bounds(&self, var_expr: &ast::Expr) -> ast::Expr {
         let replacement = self.get_replacement(var_expr);

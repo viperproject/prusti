@@ -1,4 +1,5 @@
 use crate::vir::{ast::*, cfg, cfg::CfgMethod, utils::walk_method, CfgBlock, Type};
+use prusti_utils::force_matches;
 use log::debug;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
@@ -151,25 +152,21 @@ impl<'a> StmtFolder for Purifier<'a> {
     fn fold_assign(&mut self, target: Expr, mut source: Expr, kind: AssignKind) -> Stmt {
         if let Expr::Local(local, _) = &target {
             if self.targets.contains(&local.name) {
-                match source.get_type() {
-                    Type::TypedRef(name) => {
-                        match name.as_str() {
-                            "bool" => {
-                                source = source.field(Field {
-                                    name: "val_bool".into(),
-                                    typ: Type::Bool,
-                                });
-                            }
-                            "i32" | "usize" | "u32" => {
-                                source = source.field(Field {
-                                    name: "val_int".into(),
-                                    typ: Type::Int,
-                                });
-                            }
-                            x => unreachable!("{}", x),
-                        }
+                let source_name = force_matches!(source.get_type(), Type::TypedRef(name) => name);
+                match source_name.as_str() {
+                    "bool" => {
+                        source = source.field(Field {
+                            name: "val_bool".into(),
+                            typ: Type::Bool,
+                        });
                     }
-                    _ => unreachable!(),
+                    "i32" | "usize" | "u32" => {
+                        source = source.field(Field {
+                            name: "val_int".into(),
+                            typ: Type::Int,
+                        });
+                    }
+                    x => unreachable!("{}", x),
                 }
             }
         }
