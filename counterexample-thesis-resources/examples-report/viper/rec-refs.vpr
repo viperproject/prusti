@@ -1,0 +1,10 @@
+field elem:Int;
+field next: Ref;
+
+method foo(x: Ref, y:Ref)
+    requires acc(x.next) && acc(y.next)
+    requires acc(x.next.elem)
+    requires acc(y.next.elem)
+    {
+        assert(x.next.elem == y.next.elem) 
+    } 

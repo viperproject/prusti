@@ -1,0 +1,14 @@
+error: [Prusti: verification error] postcondition might not hold.
+ --> counterexample-thesis-resources/cetests/thesis-examples/max.rs:4:11
+  |
+4 | #[ensures(result > x.0 || result > x.1)]
+  |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+note: the error originates here
+ --> counterexample-thesis-resources/cetests/thesis-examples/max.rs:4:11
+  |
+4 | #[ensures(result > x.0 || result > x.1)]
+  |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Verification failed
+error: aborting due to previous error; 1 warning emitted

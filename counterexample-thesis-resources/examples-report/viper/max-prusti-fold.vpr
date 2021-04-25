@@ -1,0 +1,12 @@
+field val_int: Int
+method max(_1:Ref, _2:Ref) returns (_0:Int)
+    ensures(acc(_1.val_int) && acc(_2.val_int))
+    ensures(_0 > _1.val_int || _0 > _2.val_int)
+    {
+        inhale(acc(_1.val_int) && acc(_2.val_int))
+        if (_1.val_int > _2.val_int) {
+            _0 := _1.val_int
+        } else {
+            _0 := _2.val_int
+        }
+    }

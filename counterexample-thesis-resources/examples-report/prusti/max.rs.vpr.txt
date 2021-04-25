@@ -1,0 +1,34 @@
+field tuple_0: Ref
+field tuple_1: Ref
+field val_bool: Bool
+field val_int: Int
+field val_ref: Ref
+
+predicate tuple2$i32$i32(self: Ref) {
+  acc(self.tuple_0, write) && (acc(i32(self.tuple_0), write) && (acc(self.tuple_1, write) && acc(i32(self.tuple_1), write)))
+}
+
+method m_max() returns (_0: Ref)
+{
+  inhale acc(tuple2$i32$i32(_1), write)
+  _3 := _1.tuple_0.val_int
+  _4 := _1.tuple_1.val_int
+  _2.val_bool := _3 > _4
+  __t4 := _2.val_bool
+  if (!__t4) {
+    goto bb0
+  }
+  goto return
+  label bb0
+  _0.val_int := _1.tuple_1.val_int
+
+  label l2
+  assert (_0.val_int >  _1.tuple_0.val_int) || (_0.val_int > _1.tuple_1.val_int)
+  goto end_of_method
+
+  label return
+  _0.val_int := _1.tuple_0.val_int
+  goto l2
+
+  label end_of_method
+}

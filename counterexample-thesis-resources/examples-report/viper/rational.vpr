@@ -1,0 +1,5 @@
+method foo(x:Rational) 
+requires x != 0/1 
+{
+    assert(false)
+}

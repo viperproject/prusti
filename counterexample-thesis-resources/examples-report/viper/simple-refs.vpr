@@ -1,0 +1,10 @@
+field field1: Int
+field field2: Int
+field next: Ref
+
+method simple(x: Ref)
+    requires acc(x.next)
+    requires acc(x.next.field2) && acc(x.next.field1)
+    {
+        assert(x.next.field2 == x.next.field1)
+    }
