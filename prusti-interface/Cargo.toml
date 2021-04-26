@@ -14,6 +14,7 @@ doctest = false # we have no doc tests
 analysis = { path = "../analysis" }
 prusti-specs = { path = "../prusti-specs" }
 prusti-common = { path = "../prusti-common" }
+prusti-utils = { path = "../prusti-utils" }
 log = { version = "0.4", features = ["release_max_level_info"] }
 lazy_static = "1.4.0"
 polonius-engine = "0.12.1"

@@ -14,3 +14,4 @@ proc-macro2 = "1.0.24"
 uuid = { version = "0.8", features = ["v4", "serde"] }
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
+prusti-utils = { path = "../prusti-utils" }

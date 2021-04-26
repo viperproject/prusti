@@ -19,6 +19,7 @@ use std::convert::{TryFrom, TryInto};
 use specifications::untyped;
 use parse_closure_macro::ClosureWithSpec;
 pub use spec_attribute_kind::SpecAttributeKind;
+use prusti_utils::force_matches;
 
 macro_rules! handle_result {
     ($parse_result: expr) => {
@@ -490,11 +491,9 @@ pub fn predicate(attr: TokenStream, tokens: TokenStream) -> TokenStream {
         ).to_compile_error();
     };
 
-    let pred_tokens = if let Some(TokenTree::Group(group)) = block_tokens.into_iter().next() {
-        group.stream()
-    } else {
-        unreachable!("a function's block must be a brace-delimited `TokenTree::Group`")
-    };
+    let pred_tokens = force_matches!(block_tokens.into_iter().next(),
+         Some(TokenTree::Group(group)) => group.stream()
+     );
 
     let mut rewriter = rewriter::AstRewriter::new();
     let spec_id = rewriter.generate_spec_id();

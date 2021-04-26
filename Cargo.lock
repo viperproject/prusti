@@ -1666,6 +1666,7 @@ dependencies = [
  "itertools",
  "lazy_static",
  "log 0.4.14",
+ "prusti-utils",
  "regex",
  "serde 1.0.125",
  "uuid 0.8.2",
@@ -1711,6 +1712,7 @@ dependencies = [
  "polonius-engine",
  "prusti-common",
  "prusti-specs",
+ "prusti-utils",
  "regex",
  "rustc-hash",
  "serde 1.0.125",
@@ -1752,6 +1754,7 @@ name = "prusti-specs"
 version = "0.1.0"
 dependencies = [
  "proc-macro2",
+ "prusti-utils",
  "quote",
  "serde 1.0.125",
  "serde_json",
@@ -1768,6 +1771,10 @@ dependencies = [
  "prusti-launch",
  "prusti-server",
 ]
+
+[[package]]
+name = "prusti-utils"
+version = "0.1.0"
 
 [[package]]
 name = "prusti-viper"

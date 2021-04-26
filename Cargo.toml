@@ -12,6 +12,7 @@ members = [
     "prusti-viper",
     "prusti-server",
     "prusti-launch",
+    "prusti-utils",
     "test-crates",
     "viper",
     "viper-sys",

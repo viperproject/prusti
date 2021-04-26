@@ -15,3 +15,4 @@ serde = { version = "1.0", features = ["derive"] }
 lazy_static = "1.4.0"
 uuid = { version = "0.8", features = ["v4"] }
 regex = "1.4"
+prusti-utils = { path = "../prusti-utils" }

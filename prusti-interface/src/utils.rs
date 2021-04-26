@@ -13,6 +13,8 @@ use std::collections::HashSet;
 use rustc_ast::ast;
 use log::trace;
 
+use prusti_utils::force_matches;
+
 /// Check if the place `potential_prefix` is a prefix of `place`. For example:
 ///
 /// +   `is_prefix(x.f, x.f) == true`
@@ -104,11 +106,9 @@ pub fn expand_one_level<'tcx>(
         }
         mir::ProjectionElem::Downcast(_symbol, variant) => {
             let kind = &current_place.ty(mir, tcx).ty.kind();
-            if let ty::TyKind::Adt(adt, _) = kind {
+            force_matches!(kind,ty::TyKind::Adt(adt, _) =>
                 (tcx.mk_place_downcast(current_place, adt, variant), Vec::new())
-            } else {
-                unreachable!();
-            }
+            )
         }
         mir::ProjectionElem::Deref => {
             (tcx.mk_place_deref(current_place), Vec::new())
@@ -314,12 +314,10 @@ pub fn read_prusti_attrs(attr_name: &str, attrs: &[ast::Attribute]) -> Vec<Strin
             use rustc_ast::tokenstream::{TokenTree, TokenStream};
             use rustc_ast::token::DelimToken;
             fn extract_string(token: &Token) -> String {
-                match &token.kind {
-                    TokenKind::Literal(Lit { symbol, .. }) => {
+                force_matches!(&token.kind, TokenKind::Literal(Lit { symbol, .. }) => {
                         symbol.as_str().replace("\\\"", "\"")
                     }
-                    x => unreachable!("{:?}", x),
-                }
+                )
             }
             strings.push(extract_string(token));
         };

@@ -7,6 +7,7 @@
 use config;
 use viper::{self, AstFactory};
 use vir::{ast::*, borrows::borrow_id, Program};
+use prusti_utils::force_matches;
 
 pub trait ToViper<'v, T> {
     fn to_viper(&self, ast: &AstFactory<'v>) -> T;
@@ -244,7 +245,7 @@ impl<'v> ToViper<'v, viper::Stmt<'v>> for Stmt {
                 )
             }
             &Stmt::ApplyMagicWand(ref wand, ref pos) => {
-                let inhale = if let Expr::MagicWand(_, _, Some(borrow), _) = wand {
+                let inhale = force_matches!(wand, Expr::MagicWand(_, _, Some(borrow), _) => {
                     let borrow: usize = borrow_id(*borrow);
                     let borrow: Expr = borrow.into();
                     ast.inhale(
@@ -254,9 +255,7 @@ impl<'v> ToViper<'v, viper::Stmt<'v>> for Stmt {
                         ),
                         pos.to_viper(ast),
                     )
-                } else {
-                    unreachable!()
-                };
+                });
                 let position = ast.identifier_position(pos.line(), pos.column(), &pos.id().to_string());
                 let apply = ast.apply(wand.to_viper(ast), position);
                 ast.seqn(&[inhale, apply], &[])
