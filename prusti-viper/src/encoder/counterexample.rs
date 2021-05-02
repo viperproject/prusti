@@ -55,7 +55,7 @@ impl Counterexample {
                 prusti_error = prusti_error.add_note(&note, Some(place.1.clone()));
             }
             // Todo: find span of return type to give this note a span
-            let result_note = format!("result <- {:#?}", self.result);
+            let result_note = format!("counterexample for result \nresult <- {:#?}", self.result);
             prusti_error = prusti_error.add_note(&result_note, None);
         }
         prusti_error
@@ -107,7 +107,7 @@ impl fmt::Debug for Entry {
         match self {
             Entry::IntEntry { value } => write!(f, "{}", value),
             Entry::BoolEntry { value } => write!(f, "{}", value),
-            Entry::CharEntry { value } => write!(f, "'{}' ({:x})", value, *value as i32),
+            Entry::CharEntry { value } => write!(f, "'{}' (0x{:x})", value, *value as i32),
             Entry::RefEntry { el } => write!(f, "ref({:#?})", el),
             Entry::Enum { super_name, name, field_entries } => {
                 let named_fields = field_entries.len() > 0 && !field_entries[0].0.parse::<usize>().is_ok();
