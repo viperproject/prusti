@@ -112,3 +112,10 @@ prusti-tests/tests/verify/fail/loops/havock_loop_vars.rs
 prusti-tests/tests/verify/fail/loops/incorrect_invariant.rs
 prusti-tests/tests/verify/fail/moves/basic.rs
 prusti-tests/tests/verify/fail/closures/basic.rs
+counterexample-thesis-resources/evaluation/account.rs
+counterexample-thesis-resources/evaluation/account-fail.rs
+counterexample-thesis-resources/evaluation/char-bool.rs
+counterexample-thesis-resources/evaluation/enum.rs
+counterexample-thesis-resources/evaluation/loop.rs
+counterexample-thesis-resources/evaluation/spurious.rs
+counterexample-thesis-resources/evaluation/tuple.rs

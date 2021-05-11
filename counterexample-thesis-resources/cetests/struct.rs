@@ -1,24 +1,23 @@
 use prusti_contracts::*;
 
 
-pub struct Whatever{
-    value: i32,
-    other_value: i32,
-    valid: bool,
+pub struct Account {
+    balance: i32,
 }
 
-pub fn main() {}
-
-#[requires(x.value != x.other_value && x.value != 42)]
-#[ensures(result.value!=42)]
-pub fn foo(x: Whatever) -> Whatever {
-    if x.valid {
-        Whatever{
-            value: 42,
-            other_value: 43,
-            valid: false,
-        }
-    } else {
-        x
+#[requires(amount > 0 && x.balance > amount && y.balance >= 0)]
+#[ensures(old(y.balance) > result.1.balance)]
+pub fn transfer(
+    mut x: Account, 
+    mut y: Account, 
+    amount: i32
+) -> (Account, Account) {
+    if x.balance >= amount {
+        let temp = y.balance;
+        x.balance -= amount;
+        y.balance += amount;
     }
+    (x, y)
 }
+
+fn main(){}

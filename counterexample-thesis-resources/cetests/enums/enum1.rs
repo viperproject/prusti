@@ -1,6 +1,6 @@
 use prusti_contracts::*;
 
-pub enum Choose{
+pub enum Choose {
     One,
     Two(i32),
     Three(bool)

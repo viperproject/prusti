@@ -9,7 +9,6 @@ use std::collections::HashMap;
 use rustc_span::source_map::SourceMap;
 use rustc_span::MultiSpan;
 use viper::VerificationError;
-use viper::silicon_counterexample::*;
 use prusti_interface::PrustiError;
 use log::debug;
 use prusti_interface::data::ProcedureDefId;
