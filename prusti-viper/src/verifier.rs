@@ -326,13 +326,15 @@ impl<'v, 'tcx> Verifier<'v, 'tcx> {
                 //counterexamples:
                 if config::produce_counterexample() { 
                     if let Some(id) = error_manager.get_def_id(&verification_error) {
-                        let counterexample = counterexample_translation::backtranslate(
-                            &self.encoder, 
-                            *id,
-                            verification_error.counterexample,
-                        );
-                        if let Some(ce) = counterexample {
-                            prusti_error = ce.annotate_error(prusti_error);
+                        if let Some(silicon_counterexample) = verification_error.counterexample {
+                            let counterexample = counterexample_translation::backtranslate(
+                                &self.encoder, 
+                                *id,
+                                silicon_counterexample,
+                            );
+                            if let Some(ce) = counterexample {
+                                prusti_error = ce.annotate_error(prusti_error);
+                            }
                         }
                     }
                 }

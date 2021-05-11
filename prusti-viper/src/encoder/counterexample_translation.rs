@@ -31,51 +31,47 @@ pub struct CounterexampleTranslator<'tcx> {
 pub fn backtranslate<'tcx>(
     encoder: &Encoder,
     def_id: ProcedureDefId,
-    opt_silicon_counterexample: Option<SiliconCounterexample>,
+    silicon_counterexample: SiliconCounterexample,
 ) -> Option<Counterexample> {
-    if let Some(silicon_counterexample) = opt_silicon_counterexample {
-        let translator = CounterexampleTranslator::new(encoder, def_id, silicon_counterexample);
-        //optimally (at a later stage) we would use the "main" counterexample 
-        //from silicon, the one not associated with any label, because it contains
-        //the values of the function when it fails. But currently
-        //most values can not be obtained there because they're folded
-        let last_label: Option<&String> = translator
-            .silicon_counterexample
-            .label_order.last();
-        let old_impure_label = "old".to_string();
-        let old_label = if translator.is_pure {
-            None
-        } else {
-            Some(&old_impure_label)
-        };
-        //to be processed:
-        let entries_to_process = translator.entries_to_process();
-        let (result_sil_name, result_typ) = translator.result_to_process();
-        //now map those needed:
-        let mut entries = HashMap::new();
-        let mut args = HashMap::new();
-
-        for (rust_name, span, vir_name, typ, is_arg) in entries_to_process {
-            if !translator.is_pure {
-                let entry = translator.process_variable_at_label(last_label, &vir_name, typ);
-                entries.insert((rust_name.clone(), span.clone()), entry);
-            }
-            if is_arg {
-                let arg_entry = translator.process_variable_at_label(old_label, &vir_name, typ);
-                args.insert((rust_name, span), arg_entry);
-            }
-        }
-        let result = translator.process_variable_at_label(
-            last_label,
-            &result_sil_name,
-            result_typ,
-        );
-        let result_span = translator.result_span();
-
-        Some(Counterexample::new(result, result_span, args, entries, translator.is_pure))
-    } else {
+    let translator = CounterexampleTranslator::new(encoder, def_id, silicon_counterexample);
+    //optimally (at a later stage) we would use the "main" counterexample 
+    //from silicon, the one not associated with any label, because it contains
+    //the values of the function when it fails. But currently
+    //most values can not be obtained there because they're folded
+    let last_label: Option<&String> = translator
+        .silicon_counterexample
+        .label_order.last();
+    let old_impure_label = "old".to_string();
+    let old_label = if translator.is_pure {
         None
+    } else {
+        Some(&old_impure_label)
+    };
+    //to be processed:
+    let entries_to_process = translator.entries_to_process();
+    let (result_sil_name, result_typ) = translator.result_to_process();
+    //now map those needed:
+    let mut entries = HashMap::new();
+    let mut args = HashMap::new();
+
+    for (rust_name, span, vir_name, typ, is_arg) in entries_to_process {
+        if !translator.is_pure {
+            let entry = translator.process_variable_at_label(last_label, &vir_name, typ);
+            entries.insert((rust_name.clone(), span.clone()), entry);
+        }
+        if is_arg {
+            let arg_entry = translator.process_variable_at_label(old_label, &vir_name, typ);
+            args.insert((rust_name, span), arg_entry);
+        }
     }
+    let result = translator.process_variable_at_label(
+        last_label,
+        &result_sil_name,
+        result_typ,
+    );
+    let result_span = translator.result_span();
+
+    Some(Counterexample::new(result, result_span, args, entries, translator.is_pure))
 }
 
 impl<'tcx> CounterexampleTranslator<'tcx> {
