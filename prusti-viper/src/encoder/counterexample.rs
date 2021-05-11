@@ -62,23 +62,6 @@ impl Counterexample {
     }
 }
 
-impl fmt::Display for Counterexample {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Counterexample:\n");
-        write!(f, "initial args:\n");
-        for (place, entry) in &self.args {
-            let s = format!("{} <- {:?}\n", place.0, entry);
-            write!(f, "{}", indent(s));
-        }
-        write!(f, "\nlocal values when failing:\n");
-        for (place, entry) in &self.entries {
-            let s = format!("{} <- {:?}\n", place.0, entry);
-            write!(f, "{}", indent(s));
-        }
-        write!(f, "\nresult <- {:#?}", self.result)
-    }
-}
-
 pub enum Entry {
     IntEntry { value: i64 },
     BoolEntry { value: bool },
@@ -146,24 +129,3 @@ impl fmt::Debug for Entry {
         }
     }
 }
-
-//for printing multiline-entries, indents all but the first line
-fn indent(s: String) -> String {
-    let mut res = "".to_owned();
-    let length = s.lines().count();
-    let mut lines = s.lines();
-    if length > 1 {
-        res.push_str(lines.next().unwrap());
-        res.push_str("\n");
-        while let Some(l) = lines.next() {
-            res.push_str("  ");
-            res.push_str(l);
-            res.push_str("\n");
-        }
-        res
-    } else {
-        s
-    }
-}
-
-
