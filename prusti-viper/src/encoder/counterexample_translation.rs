@@ -41,7 +41,15 @@ pub fn backtranslate<'tcx>(
     let last_label: Option<&String> = translator
         .silicon_counterexample
         .label_order.last();
-    let old_impure_label = "old".to_string();
+    
+    let old_impure_label = if translator
+        .silicon_counterexample
+        .label_order
+        .contains(&"l0".to_string()) {
+            "l0".to_string()
+        } else {
+            "old".to_string()
+        };
     let old_label = if translator.is_pure {
         None
     } else {
