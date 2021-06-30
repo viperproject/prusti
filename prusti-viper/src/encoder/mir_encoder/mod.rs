@@ -690,7 +690,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> MirEncoder<'p, 'v, 'tcx> {
                     let pos = self
                         .encoder
                         .error_manager()
-                        .register(span, ErrorCtxt::TypeCast);
+                        .register(span, ErrorCtxt::TypeCast, self.def_id);
                     let return_type = self.encoder.encode_snapshot_type(dst_ty).with_span(span)?;
                     return Ok(vir::Expr::func_app(
                         function_name,
@@ -764,7 +764,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> MirEncoder<'p, 'v, 'tcx> {
     pub fn encode_expr_pos(&self, span: Span) -> vir::Position {
         self.encoder
             .error_manager()
-            .register(span, ErrorCtxt::GenericExpression)
+            .register(span, ErrorCtxt::GenericExpression, self.def_id)
     }
 
     /// Return the cause of a call to `begin_panic`

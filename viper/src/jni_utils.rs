@@ -12,6 +12,7 @@ use jni::sys::jsize;
 use jni::JNIEnv;
 use viper_sys::wrappers::*;
 use java_exception::JavaException;
+use std::collections::HashMap;
 
 #[derive(Clone, Copy)]
 pub struct JniUtils<'a> {
@@ -139,6 +140,48 @@ impl<'a> JniUtils<'a> {
             res.push(item);
         }
         res
+    }
+
+    pub fn list_to_vec(&self, list: JObject<'a>) -> Vec<JObject<'a>> {
+        let list_wrapper = scala::collection::immutable::List::with(self.env);
+        let seq = self.unwrap_result(
+            list_wrapper.call_toSeq(list)
+        );
+        self.seq_to_vec(seq)
+    }
+    
+    /// Converts a Scala Map (using strings! JObjects are not hashable) to a Rust HashMap
+    pub fn stringmap_to_hashmap(&self, map: JObject<'a>) -> HashMap<String, JObject<'a>> {
+        let iter_wrapper = scala::collection::Iterable::with(self.env);
+        let product_wrapper= scala::Product::with(self.env);
+        
+        let mut res_map = HashMap::new();
+        let seq = self.unwrap_result(iter_wrapper.call_toSeq(map));
+        let vector = self.seq_to_vec(seq);
+        let length = vector.len();
+        for i in 0..length {
+            let item1 = self.unwrap_result(product_wrapper.call_productElement(vector[i], 0));
+            let string1 = self.to_string(item1); //this should be a string!
+            let item2 = self.unwrap_result(product_wrapper.call_productElement(vector[i], 1));
+            res_map.insert(string1, item2);
+        } 
+        res_map
+    }
+
+    pub fn stringmap_to_keyvec(&self, map: JObject<'a>) -> Vec<String> {
+        let iter_wrapper = scala::collection::Iterable::with(self.env);
+        let product_wrapper = scala::Product::with(self.env);
+
+        let mut res_vec = vec![];
+        let seq = self.unwrap_result(iter_wrapper.call_toSeq(map));
+        let vector = self.seq_to_vec(seq);
+        let length = vector.len();
+        for i in 0..length {
+            let item = self.unwrap_result(product_wrapper.call_productElement(vector[i], 0));
+            let string = self.to_string(item);
+            res_vec.push(string);
+        }
+        res_vec
     }
 
     /// Checks if an object is a subtype of a Java class

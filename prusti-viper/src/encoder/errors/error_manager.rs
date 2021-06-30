@@ -11,6 +11,7 @@ use rustc_span::MultiSpan;
 use viper::VerificationError;
 use prusti_interface::PrustiError;
 use log::debug;
+use prusti_interface::data::ProcedureDefId;
 
 /// The cause of a panic!()
 #[derive(Clone, Debug)]
@@ -102,6 +103,7 @@ pub struct ErrorManager<'tcx> {
     codemap: &'tcx SourceMap,
     source_span: HashMap<u64, MultiSpan>,
     error_contexts: HashMap<u64, ErrorCtxt>,
+    def_id: HashMap<u64, ProcedureDefId>,
     next_pos_id: u64,
 }
 
@@ -112,13 +114,15 @@ impl<'tcx> ErrorManager<'tcx>
             codemap,
             source_span: HashMap::new(),
             error_contexts: HashMap::new(),
+            def_id: HashMap::new(),
             next_pos_id: 1,
         }
     }
 
-    pub fn register<T: Into<MultiSpan>>(&mut self, span: T, error_ctxt: ErrorCtxt) -> Position {
+    pub fn register<T: Into<MultiSpan>>(&mut self, span: T, error_ctxt: ErrorCtxt, def_id: ProcedureDefId) -> Position {
         let pos = self.register_span(span);
         self.register_error(&pos, error_ctxt);
+        self.def_id.insert(pos.id(), def_id);
         pos
     }
 
@@ -153,6 +157,12 @@ impl<'tcx> ErrorManager<'tcx>
     pub fn register_error(&mut self, pos: &Position, error_ctxt: ErrorCtxt) {
         debug!("Register error at: {:?}", pos.id());
         self.error_contexts.insert(pos.id(), error_ctxt);
+    }
+
+    pub fn get_def_id(&self, ver_error: &VerificationError) -> Option<&ProcedureDefId> {
+        ver_error.pos_id.as_ref()
+            .and_then(|id| id.parse().ok())
+            .and_then(|id| self.def_id.get(&id)) 
     }
 
     pub fn translate_verification_error(&self, ver_error: &VerificationError) -> PrustiError {

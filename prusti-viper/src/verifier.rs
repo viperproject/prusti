@@ -9,6 +9,7 @@ use prusti_common::{
     config, report::log, verification_context::VerifierBuilder, verification_service::*, Stopwatch,
 };
 use crate::encoder::Encoder;
+use crate::encoder::counterexample_translation;
 // use prusti_filter::validators::Validator;
 use prusti_interface::data::VerificationResult;
 use prusti_interface::data::VerificationTask;
@@ -319,8 +320,24 @@ impl<'v, 'tcx> Verifier<'v, 'tcx> {
 
             for verification_error in verification_errors {
                 debug!("Verification error: {:?}", verification_error);
-                let prusti_error = error_manager.translate_verification_error(&verification_error);
+                let mut prusti_error = error_manager.translate_verification_error(&verification_error);
                 debug!("Prusti error: {:?}", prusti_error);
+                
+                //counterexamples:
+                if config::produce_counterexample() { 
+                    if let Some(id) = error_manager.get_def_id(&verification_error) {
+                        if let Some(silicon_counterexample) = verification_error.counterexample {
+                            let counterexample = counterexample_translation::backtranslate(
+                                &self.encoder, 
+                                *id,
+                                silicon_counterexample,
+                            );
+                            if let Some(ce) = counterexample {
+                                prusti_error = ce.annotate_error(prusti_error);
+                            }
+                        }
+                    }
+                }
                 prusti_error.emit(self.env);
             }
             VerificationResult::Failure

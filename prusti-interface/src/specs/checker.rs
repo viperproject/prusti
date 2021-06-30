@@ -154,7 +154,7 @@ impl<'tcx> SpecChecker {
                 "using predicate from non-specification code is not allowed".to_string(),
                 MultiSpan::from_span(usage_span),
             )
-            .set_note("this is a specification-only predicate function", def_span)
+            .add_note("this is a specification-only predicate function", Some(def_span))
             .emit(env);
         }
     }
