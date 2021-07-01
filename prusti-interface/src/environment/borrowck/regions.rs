@@ -100,16 +100,33 @@ impl PlaceRegions {
     }
 }
 
+fn extract_region_id(region: &ty::RegionKind) -> facts::Region {
+    match region {
+        ty::RegionKind::ReVar(rvid) => {
+            *rvid
+        },
+        _ => unimplemented!("region: {:?}", region),
+    }
+}
+
 fn extract_region(place_regions: &mut PlaceRegions, local: mir::Local, ty: ty::Ty<'_>) {
     match ty.kind() {
         ty::TyKind::Ref(region, _, _) => {
-            match region {
-                ty::RegionKind::ReVar(rvid) => {
-                    place_regions.add_local(local, *rvid);
-                },
-                _ => unimplemented!("region: {:?}", region),
-            }
+            place_regions.add_local(local, extract_region_id(region));
             debug!("region: {:?}", region);
+        }
+        ty::TyKind::Tuple(substs) => {
+            for (i, ty) in substs.types().enumerate() {
+                match ty.kind() {
+                    ty::TyKind::Ref(region, _, _) => {
+                        place_regions.add(local, vec![i], extract_region_id(region))
+                    }
+                    _ => {
+                        debug!("does not contain regions: {:?}[{}]: {:?} {:?}", local, i, ty, ty.kind());
+                    }
+                }
+
+            }
         }
         _ => {
             debug!("does not contain regions: {:?}: {:?} {:?}", local, ty, ty.kind());
