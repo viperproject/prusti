@@ -58,38 +58,102 @@ impl<'tcx> SpecsClosuresCollector<'tcx> {
         }
         let tcx = env.tcx();
         let mir = env.local_mir(def_id);
+
+        // Iterate over all user-defined types and check which of them are user-defined closures.
+        #[derive(Debug)]
+        struct Instantiation<'tcx> {
+            closure_def_id: DefId,
+            location: Option<mir::Location>,
+            operands: Vec<Option<mir::Operand<'tcx>>>,
+            operand_tys: Vec<ty::Ty<'tcx>>,
+        }
+
+        let mut spec_closures = HashMap::new();
+        for local in mir.vars_and_temps_iter() {
+            let decl = &mir.local_decls[local];
+            match decl.ty.kind() {
+                ty::TyKind::Closure(cl_def_id, substs) => {
+                    if env.has_prusti_attribute(*cl_def_id, "spec_only") {
+                        let closure = substs.as_closure();
+                        let operand_tys: Vec<_> = closure.upvar_tys().collect();
+                        let instantiation = Instantiation {
+                            closure_def_id: *cl_def_id,
+                            location: None,
+                            operands: vec![None; operand_tys.len()],
+                            operand_tys,
+                        };
+                        spec_closures.insert(local, instantiation);
+                    }
+                }
+                _=> {}
+            }
+        }
+
+
         for (bb_index, bb_data) in mir.basic_blocks().iter_enumerated() {
             for (stmt_index, stmt) in bb_data.statements.iter().enumerate() {
-                if let mir::StatementKind::Assign(
-                    box (
-                        _,
-                        mir::Rvalue::Aggregate(
-                            box mir::AggregateKind::Closure(cl_def_id, _),
-                            ref operands,
-                        ),
-                    )
-                ) = stmt.kind {
-                    // Skip closures that are not annotated with `prusti::spec_only`.
-                    if !env.has_prusti_attribute(cl_def_id, "spec_only") {
-                        continue;
+                match &stmt.kind {
+                    mir::StatementKind::StorageLive(local) => {
+                        if let Some(instantiation) = spec_closures.get_mut(&local) {
+                            assert!(instantiation.location.is_none(), "location must not be set");
+                        }
                     }
-                    trace!("Found closure instantiation at {:?}", stmt);
-                    let operand_tys = operands.iter().map(
-                        |operand| operand.ty(&*mir, tcx)
-                    ).collect();
-                    let instantiations =
-                        self.instantiations.entry(cl_def_id).or_insert(vec![]);
-                    instantiations.push((
-                        def_id.to_def_id(),
-                        mir::Location {
-                            block: bb_index,
-                            statement_index: stmt_index,
-                        },
-                        operands.clone(),
-                        operand_tys
-                    ));
+                    mir::StatementKind::StorageDead(local) => {
+                        if let Some(instantiation) = spec_closures.get_mut(&local) {
+                            assert!(instantiation.location.is_none(), "location is already set");
+                            instantiation.location = Some(mir::Location {
+                                block: bb_index,
+                                statement_index: stmt_index,
+                            });
+                        }
+                    }
+                    mir::StatementKind::Assign(box (place, mir::Rvalue::Use(operand))) => {
+                        if let Some(instantiation) = spec_closures.get_mut(&place.local) {
+                            let mut indices = Vec::new();
+                            for elem in place.projection.iter() {
+                                match elem {
+                                    mir::ProjectionElem::Field(field, _) => {
+                                        indices.push(field.index());
+                                    }
+                                    _ => unreachable!(),
+                                }
+                            }
+                            assert_eq!(indices.len(), 1);
+                            let index = indices[0];
+                            assert!(instantiation.operands[index].is_none());
+                            instantiation.operands[index] = Some(operand.clone());
+                        }
+                    }
+                    mir::StatementKind::Assign(box (place, rvalue)) => {
+                        if let Some(_) = spec_closures.get_mut(&place.local) {
+                            unreachable!("Unexpected rvalue: {:?}", rvalue);
+                        }
+                    }
+                    _ => {}
                 }
             }
+        }
+
+        for (_local, instantiation) in spec_closures {
+            let Instantiation {
+                closure_def_id,
+                location,
+                operands,
+                operand_tys,
+            } = instantiation;
+            let location = location.unwrap();
+            let operands: Vec<_> = operands.into_iter().map(Option::unwrap).collect();
+            for (operand, &ty) in operands.iter().zip(&operand_tys) {
+                assert_eq!(operand.ty(&*mir, tcx), ty);
+            }
+            let instantiations =
+                self.instantiations.entry(closure_def_id).or_insert(vec![]);
+            instantiations.push((
+                def_id.to_def_id(),
+                location,
+                operands,
+                operand_tys
+            ));
         }
     }
 

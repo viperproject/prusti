@@ -31,6 +31,7 @@ use prusti_common::{
         CfgBlockIndex, Expr, ExprIterator, Successor, Type,
     },
 };
+use prusti_interface::environment::try_extract_spec_closure;
 use prusti_interface::{
     data::ProcedureDefId,
     environment::{
@@ -80,7 +81,7 @@ pub struct ProcedureEncoder<'p, 'v: 'p, 'tcx: 'v> {
     mir_encoder: MirEncoder<'p, 'v, 'tcx>,
     check_panics: bool,
     check_foldunfold_state: bool,
-    polonius_info: Option<PoloniusInfo<'p, 'tcx>>,
+    polonius_info: Option<PoloniusInfo<'tcx>>,
     procedure_contract: Option<ProcedureContract<'tcx>>,
     label_after_location: HashMap<mir::Location, String>,
     // /// Store the CFG blocks that encode a MIR block each.
@@ -224,7 +225,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         }
     }
 
-    fn polonius_info(&self) -> &PoloniusInfo<'p, 'tcx> {
+    fn polonius_info(&self) -> &PoloniusInfo<'tcx> {
         self.polonius_info.as_ref().unwrap()
     }
 
@@ -364,7 +365,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
 
         // Load Polonius info
         self.polonius_info = Some(
-            PoloniusInfo::new(&self.procedure, &self.cached_loop_invariant_block)
+            PoloniusInfo::new(self.encoder.env(), &self.procedure, &self.cached_loop_invariant_block)
                 .map_err(|err| self.translate_polonius_error(err))?,
         );
 
@@ -474,7 +475,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             .polonius_info()
             .loan_locations()
             .iter()
-            .map(|(loan, location)| (loan.into(), *location))
+            .map(|(loan, location)| (loan.index().into(), *location))
             .collect();
         let method_pos = self
             .encoder
@@ -1133,12 +1134,16 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         let span = self.mir_encoder.get_span_of_location(location);
 
         let encoding_stmts = match stmt.kind {
-            mir::StatementKind::StorageLive(..)
             | mir::StatementKind::StorageDead(..)
             | mir::StatementKind::FakeRead(..)
             | mir::StatementKind::AscribeUserType(..)
             | mir::StatementKind::Coverage(..)
             | mir::StatementKind::Nop => vec![],
+
+            mir::StatementKind::StorageLive(local) => {
+                let encoded_local = self.mir_encoder.encode_local(local).with_span(span)?;
+                self.encode_havoc_and_allocation(&encoded_local.into())
+            }
 
             mir::StatementKind::Assign(box (ref lhs, ref rhs)) => {
                 // Array access on the LHS should always be mutable (idx is always calculated
@@ -1559,7 +1564,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                     let guard = self.construct_location_guard(loan_location);
                     vir::borrows::Node::new(
                         guard,
-                        node.loan.into(),
+                        node.loan.index().into(),
                         convert_loans_to_borrows(&node.reborrowing_loans),
                         convert_loans_to_borrows(&node.reborrowed_loans),
                         Vec::new(),
@@ -1666,7 +1671,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
 
         Ok(vir::borrows::Node::new(
             guard,
-            node.loan.into(),
+            node.loan.index().into(),
             convert_loans_to_borrows(&node.reborrowing_loans),
             convert_loans_to_borrows(&node.reborrowed_loans),
             self.set_stmts_default_pos(stmts, span),
@@ -1763,19 +1768,19 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         let magic_wand = vir::Expr::MagicWand(
             box lhs.clone(),
             box rhs.clone(),
-            Some(loan.into()),
+            Some(loan.index().into()),
             pos,
         );
         stmts.push(vir::Stmt::Inhale(magic_wand));
         // Emit the apply statement.
-        let statement = vir::Stmt::apply_magic_wand(lhs, rhs, loan.into(), pos);
+        let statement = vir::Stmt::apply_magic_wand(lhs, rhs, loan.index().into(), pos);
         debug!("{:?} at {:?}", statement, loan_location);
         stmts.push(statement);
 
         let guard = self.construct_location_guard(loan_location);
         Ok(vir::borrows::Node::new(
             guard,
-            node.loan.into(),
+            node.loan.index().into(),
             convert_loans_to_borrows(&node.reborrowing_loans),
             convert_loans_to_borrows(&node.reborrowed_loans),
             stmts,
@@ -3569,7 +3574,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 self.magic_wand_at_location
                     .insert(location, (post_label.to_string(), lhs.clone(), rhs.clone()));
             }
-            magic_wands.push(vir::Expr::magic_wand(lhs, rhs, loan.map(|l| l.into())));
+            magic_wands.push(vir::Expr::magic_wand(lhs, rhs, loan.map(|l| l.index().into())));
         }
 
         // Encode permissions for return type
@@ -4415,13 +4420,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         // which we can detect and use to retrieve the specification.
         let mut specs = vec![];
         for bbi in spec_blocks {
-            for stmt in &self.mir.basic_blocks()[bbi].statements {
-                if let mir::StatementKind::Assign(box (
-                    _,
-                    mir::Rvalue::Aggregate(box mir::AggregateKind::Closure(cl_def_id, _), _),
-                )) = stmt.kind {
-                    specs.extend(self.encoder.get_loop_specs(cl_def_id).unwrap().invariant);
-                }
+            if let Some(cl_def_id) = try_extract_spec_closure(&self.mir[bbi], &self.mir, self.encoder.env().tcx()) {
+                specs.extend(self.encoder.get_loop_specs(cl_def_id).unwrap().invariant);
             }
         }
         trace!("specs: {:?}", specs);
@@ -4851,12 +4851,12 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                         lhs.clone(),
                         ref_field.clone(),
                         location,
-                        vir::AssignKind::SharedBorrow(loan.into()),
+                        vir::AssignKind::SharedBorrow(loan.index().into()),
                     )?;
                     stmts.push(vir::Stmt::Assign(
                         lhs.clone().field(ref_field.clone()),
                         src.field(ref_field),
-                        vir::AssignKind::SharedBorrow(loan.into()),
+                        vir::AssignKind::SharedBorrow(loan.index().into()),
                     ));
                     stmts
                 } else {
@@ -5241,7 +5241,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         let loan = self.polonius_info().get_loan_at_location(location);
         let (vir_assign_kind, array_encode_kind) = match mir_borrow_kind {
             mir::BorrowKind::Shared =>
-                (vir::AssignKind::SharedBorrow(loan.into()), ArrayAccessKind::Shared),
+                (vir::AssignKind::SharedBorrow(loan.index().into()), ArrayAccessKind::Shared),
             mir::BorrowKind::Unique => {
                 return Err(EncodingError::unsupported(
                     "unsuported creation of unique borrows (implicitly created in closure bindings)"
@@ -5253,7 +5253,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 )).with_span(span);
             }
             mir::BorrowKind::Mut { .. } =>
-                (vir::AssignKind::MutableBorrow(loan.into()), ArrayAccessKind::Mutable(Some(loan.into()), location)),
+                (vir::AssignKind::MutableBorrow(loan.index().into()), ArrayAccessKind::Mutable(Some(loan.index().into()), location)),
         };
         let (encoded_value, mut stmts, _, _) = self.encode_place(place, array_encode_kind).with_span(span)?;
         // Initialize ref_var.ref_field
@@ -6068,5 +6068,5 @@ enum ArrayAccessKind {
 }
 
 fn convert_loans_to_borrows(loans: &[facts::Loan]) -> Vec<Borrow> {
-    loans.iter().map(|l| l.into()).collect()
+    loans.iter().map(|l| l.index().into()).collect()
 }

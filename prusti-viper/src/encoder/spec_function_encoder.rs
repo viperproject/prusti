@@ -61,7 +61,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> SpecFunctionEncoder<'p, 'v, 'tcx> {
 
         let contract = compute_procedure_contract(
             self.proc_def_id,
-            self.encoder.env().tcx(),
+            self.encoder.env(),
             typed::SpecificationSet::Procedure(specs),
             Some(&self.encoder.current_tymap())
         ).with_span(self.span)?.to_def_site_contract();

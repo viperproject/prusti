@@ -42,7 +42,7 @@ pub(crate) fn expand_struct_place<'tcx>(
         // Downcast is a no-op.
     } else {
         match typ.ty.kind() {
-            ty::Adt(def, substs) => {
+            ty::TyKind::Adt(def, substs) => {
                 assert!(
                     def.is_struct(),
                     "Only structs can be expanded. Got def={:?}.",
@@ -57,7 +57,7 @@ pub(crate) fn expand_struct_place<'tcx>(
                     }
                 }
             }
-            ty::Tuple(slice) => {
+            ty::TyKind::Tuple(slice) => {
                 for (index, arg) in slice.iter().enumerate() {
                     if Some(index) != without_field {
                         let field = mir::Field::from_usize(index);
@@ -66,7 +66,17 @@ pub(crate) fn expand_struct_place<'tcx>(
                     }
                 }
             },
-            ty::Ref(_region, _ty, _) => match without_field {
+            ty::TyKind::Closure(_def_id, substs) => {
+                let closure = substs.as_closure();
+                for (index, field_ty) in closure.upvar_tys().enumerate() {
+                    if Some(index) != without_field {
+                        let field = mir::Field::from_usize(index);
+                        let field_place = tcx.mk_place_field(*place, field, field_ty);
+                        places.push(field_place);
+                    }
+                }
+            }
+            ty::TyKind::Ref(_region, _ty, _) => match without_field {
                 Some(without_field) => {
                     assert_eq!(
                         without_field, 0,
@@ -78,7 +88,7 @@ pub(crate) fn expand_struct_place<'tcx>(
                 }
             },
             ref ty => {
-                unimplemented!("ty={:?}", ty);
+                unimplemented!("place={:?} ty={:?}", place, ty);
             }
         }
     }

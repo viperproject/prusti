@@ -46,7 +46,7 @@ impl rustc_driver::Callbacks for PrustiCompilerCalls {
             spec_checker.report_errors(&env);
             compiler.session().abort_if_errors();
 
-            let mut spec_collector = specs::SpecCollector::new(tcx);
+            let mut spec_collector = specs::SpecCollector::new(&env);
             intravisit::walk_crate(&mut spec_collector, &krate);
             let def_spec = spec_collector.build_def_specs(&env);
             if config::print_typeckd_specs() {

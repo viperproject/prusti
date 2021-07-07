@@ -1003,7 +1003,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> BackwardMirInterpreter<'tcx>
         };
 
         match stmt.kind {
-            mir::StatementKind::StorageLive(..)
+            mir::StatementKind::Nop
+            | mir::StatementKind::StorageLive(..)
             | mir::StatementKind::StorageDead(..)
             | mir::StatementKind::FakeRead(..)    // FIXME
             // | mir::StatementKind::ReadForMatch(..)

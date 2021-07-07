@@ -50,8 +50,8 @@ struct ProcedureSpecRef {
 /// HIR. After the visit, [determine_def_specs] can be used to get back
 /// a mapping of DefIds (which may not be local due to extern specs) to their
 /// [SpecificationSet], i.e. procedures, loop invariants, and structs.
-pub struct SpecCollector<'tcx> {
-    tcx: TyCtxt<'tcx>,
+pub struct SpecCollector<'a, 'tcx: 'a> {
+    env: &'a Environment<'tcx>,
     extern_resolver: ExternSpecResolver<'tcx>,
 
     /// Collected assertions before deserialisation.
@@ -67,16 +67,16 @@ pub struct SpecCollector<'tcx> {
     loop_specs: HashMap<LocalDefId, Vec<SpecificationId>>,
 }
 
-impl<'tcx> SpecCollector<'tcx> {
-    pub fn new(tcx: TyCtxt<'tcx>) -> Self {
+impl<'a, 'tcx> SpecCollector<'a, 'tcx> {
+    pub fn new(env: &'a Environment<'tcx>) -> Self {
         Self {
-            tcx: tcx,
+            env,
             spec_items: Vec::new(),
             typed_specs: HashMap::new(),
             procedure_specs: HashMap::new(),
             loop_specs: HashMap::new(),
             typed_expressions: HashMap::new(),
-            extern_resolver: ExternSpecResolver::new(tcx),
+            extern_resolver: ExternSpecResolver::new(env.tcx()),
         }
     }
 
@@ -88,7 +88,7 @@ impl<'tcx> SpecCollector<'tcx> {
                 let assertion = reconstruct_typed_assertion(
                     spec_item.specification,
                     &self.typed_expressions,
-                    self.tcx
+                    self.env
                 );
                 (spec_item.spec_id, assertion)
             })
@@ -239,9 +239,9 @@ fn get_procedure_spec_ids(def_id: DefId, attrs: &[ast::Attribute]) -> Option<Pro
 fn reconstruct_typed_assertion<'tcx>(
     assertion: JsonAssertion,
     typed_expressions: &HashMap<String, LocalDefId>,
-    tcx: TyCtxt<'tcx>
+    env: &Environment<'tcx>
 ) -> typed::Assertion<'tcx> {
-    assertion.to_typed(typed_expressions, tcx)
+    assertion.to_typed(typed_expressions, env)
 }
 
 fn deserialize_spec_from_attrs(attrs: &[ast::Attribute]) -> JsonAssertion {
@@ -250,11 +250,11 @@ fn deserialize_spec_from_attrs(attrs: &[ast::Attribute]) -> JsonAssertion {
     JsonAssertion::from_json_string(&json_string)
 }
 
-impl<'tcx> intravisit::Visitor<'tcx> for SpecCollector<'tcx> {
+impl<'a, 'tcx: 'a> intravisit::Visitor<'tcx> for SpecCollector<'a, 'tcx> {
     type Map = Map<'tcx>;
 
     fn nested_visit_map(&mut self) -> intravisit::NestedVisitorMap<Self::Map> {
-        let map = self.tcx.hir();
+        let map = self.env.tcx().hir();
         intravisit::NestedVisitorMap::All(map)
     }
 
@@ -265,9 +265,9 @@ impl<'tcx> intravisit::Visitor<'tcx> for SpecCollector<'tcx> {
         intravisit::walk_trait_item(self, ti);
 
         let id = ti.hir_id();
-        let local_id = self.tcx.hir().local_def_id(id);
+        let local_id = self.env.tcx().hir().local_def_id(id);
         let def_id = local_id.to_def_id();
-        let attrs = self.tcx.get_attrs(ti.def_id.to_def_id());
+        let attrs = self.env.tcx().get_attrs(ti.def_id.to_def_id());
 
         // Collect procedure specifications
         if let Some(procedure_spec_ref) = get_procedure_spec_ids(def_id, attrs) {
@@ -285,9 +285,9 @@ impl<'tcx> intravisit::Visitor<'tcx> for SpecCollector<'tcx> {
     ) {
         intravisit::walk_fn(self, fn_kind, fn_decl, body_id, span, id);
 
-        let local_id = self.tcx.hir().local_def_id(id);
+        let local_id = self.env.tcx().hir().local_def_id(id);
         let def_id = local_id.to_def_id();
-        let attrs = self.tcx.hir().attrs(id);
+        let attrs = self.env.tcx().hir().attrs(id);
 
         // Collect external function specifications
         if has_extern_spec_attr(attrs) {
@@ -361,11 +361,11 @@ impl<'tcx> intravisit::Visitor<'tcx> for SpecCollector<'tcx> {
 
         // Collect closure specifications
         if let rustc_hir::StmtKind::Local(local) = stmt.kind {
-            let attrs = self.tcx.hir().attrs(local.hir_id);
+            let attrs = self.env.tcx().hir().attrs(local.hir_id);
             if has_prusti_attr(attrs, "closure") {
                 let init_expr = local.init
                     .expect("closure on Local without assignment");
-                let local_id = self.tcx.hir().local_def_id(init_expr.hir_id);
+                let local_id = self.env.tcx().hir().local_def_id(init_expr.hir_id);
                 let def_id = local_id.to_def_id();
                 // Collect procedure specifications
                 if let Some(procedure_spec_ref) = get_procedure_spec_ids(def_id, attrs) {

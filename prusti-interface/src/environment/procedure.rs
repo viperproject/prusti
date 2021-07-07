@@ -25,7 +25,7 @@ pub type BasicBlockIndex = mir::BasicBlock;
 pub struct Procedure<'a, 'tcx: 'a> {
     tcx: TyCtxt<'tcx>,
     proc_def_id: ProcedureDefId,
-    mir: Ref<'a, Mir<'tcx>>,
+    mir: &'a Mir<'tcx>,
     real_edges: RealEdges,
     loop_info: loops::ProcedureLoops,
     reachable_basic_blocks: HashSet<BasicBlock>,
@@ -35,13 +35,13 @@ pub struct Procedure<'a, 'tcx: 'a> {
 impl<'a, 'tcx> Procedure<'a, 'tcx> {
     /// Builds an implementation of the Procedure interface, given a typing context and the
     /// identifier of a procedure
-    pub fn new(tcx: TyCtxt<'tcx>, proc_def_id: ProcedureDefId) -> Self {
+    pub fn new(env: &super::Environment<'tcx>, proc_def_id: ProcedureDefId) -> Self {
         trace!("Encoding procedure {:?}", proc_def_id);
-        let (mir, _) = tcx.mir_promoted(ty::WithOptConstParam::unknown(proc_def_id.expect_local()));
-        let mir = mir.borrow();
+        let tcx = env.tcx();
+        let mir = env.local_mir(proc_def_id.expect_local());
         let real_edges = RealEdges::new(&mir);
         let reachable_basic_blocks = build_reachable_basic_blocks(&mir, &real_edges);
-        let nonspec_basic_blocks = build_nonspec_basic_blocks(&mir, &real_edges, &tcx);
+        let nonspec_basic_blocks = build_nonspec_basic_blocks(&mir, &real_edges, tcx);
         let loop_info = loops::ProcedureLoops::new(&mir, &real_edges);
 
         Self {
@@ -211,23 +211,31 @@ fn build_reachable_basic_blocks(mir: &Mir, real_edges: &RealEdges) -> HashSet<Ba
     reachable_basic_blocks
 }
 
-fn is_spec_closure(def_id: def_id::DefId, tcx: &TyCtxt) -> bool {
+fn is_spec_closure(def_id: def_id::DefId, tcx: TyCtxt) -> bool {
     crate::utils::has_spec_only_attr(tcx.get_attrs(def_id))
 }
 
-fn is_spec_basic_block(bb_data: &BasicBlockData, tcx: &TyCtxt) -> bool {
+pub fn try_extract_spec_closure(bb_data: &BasicBlockData, mir: &Mir, tcx: TyCtxt) -> Option<ProcedureDefId> {
     for stmt in &bb_data.statements {
-        if let StatementKind::Assign(box (_, rvalue)) = &stmt.kind {
-            if let Rvalue::Aggregate(box aggr, _) = rvalue {
-                if let AggregateKind::Closure(def_id, _) = aggr {
-                    if is_spec_closure(*def_id, tcx) {
-                        return true;
-                    }
+        let local = match &stmt.kind {
+            StatementKind::StorageLive(local) |
+            StatementKind::StorageDead(local) => {
+                Some(*local)
+            }
+            StatementKind::Assign(box (place, _)) => {
+                Some(place.local)
+            }
+            _ => None
+        };
+        if let Some(local) = local {
+            if let ty::TyKind::Closure(def_id, _) = mir.local_decls[local].ty.kind() {
+                if is_spec_closure(*def_id, tcx) {
+                    return Some(*def_id);
                 }
             }
         }
     }
-    return false;
+    None
 }
 
 #[derive(Debug)]
@@ -256,10 +264,10 @@ fn blocks_definitely_leading_to<'a>(bb_graph: &HashMap<BasicBlock, BasicBlockNod
     blocks
 }
 
-fn get_nonspec_basic_blocks(bb_graph: HashMap<BasicBlock, BasicBlockNode>, mir: &Mir, tcx: &TyCtxt) -> HashSet<BasicBlock>{
+fn get_nonspec_basic_blocks(bb_graph: HashMap<BasicBlock, BasicBlockNode>, mir: &Mir, tcx: TyCtxt) -> HashSet<BasicBlock>{
     let mut spec_basic_blocks: HashSet<BasicBlock> = HashSet::new();
     for (bb, _) in bb_graph.iter() {
-        if is_spec_basic_block(&mir[*bb], &tcx) {
+        if try_extract_spec_closure(&mir[*bb], &mir, tcx).is_some() {
             spec_basic_blocks.insert(*bb);
             spec_basic_blocks.extend(blocks_definitely_leading_to(&bb_graph, *bb).into_iter());
         }
@@ -271,7 +279,7 @@ fn get_nonspec_basic_blocks(bb_graph: HashMap<BasicBlock, BasicBlockNode>, mir: 
 }
 
 /// Returns the set of basic blocks that are not used as part of the typechecking of Prusti specifications
-fn build_nonspec_basic_blocks(mir: &Mir, real_edges: &RealEdges, tcx: &TyCtxt) -> HashSet<BasicBlock> {
+fn build_nonspec_basic_blocks(mir: &Mir, real_edges: &RealEdges, tcx: TyCtxt) -> HashSet<BasicBlock> {
     let dominators = mir.dominators();
     let mut loop_heads: HashSet<BasicBlock> = HashSet::new();
 

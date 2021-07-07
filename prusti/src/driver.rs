@@ -171,6 +171,8 @@ fn main() {
         ));
         rustc_args.push("-Zdump-mir=renumber".to_owned());
         rustc_args.push("-Zalways-encode-mir".to_owned());
+        rustc_args.push("-Zmir-opt-level=0".to_owned());
+        rustc_args.push("-Cdebug-assertions=on".to_owned());
         rustc_args.push("-Zcrate-attr=feature(register_tool)".to_owned());
         rustc_args.push("-Zcrate-attr=register_tool(prusti)".to_owned());
 

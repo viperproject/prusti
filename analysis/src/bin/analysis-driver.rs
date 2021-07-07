@@ -70,7 +70,7 @@ impl rustc_driver::Callbacks for OurCompilerCalls {
             for &local_def_id in local_def_ids {
                 println!("Result for function {}():", tcx.item_name(local_def_id.to_def_id()));
 
-                let body = tcx.mir_promoted(ty::WithOptConstParam::unknown(local_def_id)).0.borrow();
+                let body = tcx.optimized_mir(local_def_id);
 
                 match abstract_domain {
                     "ReachingDefsState" => {

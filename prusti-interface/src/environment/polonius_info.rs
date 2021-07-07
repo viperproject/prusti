@@ -17,12 +17,15 @@ use log::trace;
 use polonius_engine::Algorithm;
 use polonius_engine::Atom;
 use polonius_engine::Output;
-use rustc_hash::FxHashMap;
+// use rustc_hash::FxHashMap;
+use rustc_data_structures::fx::FxHashMap;
 use rustc_index::vec::Idx;
 use rustc_middle::mir;
 use rustc_middle::ty;
 use rustc_span::def_id::LOCAL_CRATE;
 use rustc_span::Span;
+use rustc_index::vec::IndexVec;
+// use rustc_mir::consumers::LocationTable;
 
 use crate::environment::borrowck::facts::PointType;
 use crate::environment::borrowck::regions::{PlaceRegions, PlaceRegionsError};
@@ -33,6 +36,7 @@ use crate::environment::mir_utils::StatementAt;
 use crate::environment::polonius_info::facts::AllInputFacts;
 use crate::utils;
 
+use super::Environment;
 use super::borrowck::facts;
 use super::borrowck::regions;
 use super::loops;
@@ -271,119 +275,124 @@ pub enum PoloniusInfoError {
     LoanInUnsupportedStatement(String, mir::Location),
 }
 
-pub fn graphviz<'tcx>(
-    tcx: rustc_middle::ty::TyCtxt<'tcx>,
-    def_path: &rustc_hir::definitions::DefPath,
-    _mir: &mir::Body<'tcx>,
-) -> std::io::Result<()> {
-    macro_rules! to_html {
-        ( $o:expr ) => {{
-            format!("{:?}", $o)
-                .replace("{", "\\{")
-                .replace("}", "\\}")
-                .replace("&", "&amp;")
-                .replace(">", "&gt;")
-                .replace("<", "&lt;")
-                .replace("\n", "<br/>")
-        }};
-    }
-    macro_rules! to_sorted_string {
-        ( $o:expr ) => {{
-            let mut vector = $o.iter().map(|x| to_html!(x)).collect::<Vec<String>>();
-            vector.sort();
-            vector.join(", ")
-        }};
-    }
+// pub fn graphviz<'tcx>(
+//     tcx: rustc_middle::ty::TyCtxt<'tcx>,
+//     def_path: &rustc_hir::definitions::DefPath,
+//     _mir: &mir::Body<'tcx>,
+// ) -> std::io::Result<()> {
+//     macro_rules! to_html {
+//         ( $o:expr ) => {{
+//             format!("{:?}", $o)
+//                 .replace("{", "\\{")
+//                 .replace("}", "\\}")
+//                 .replace("&", "&amp;")
+//                 .replace(">", "&gt;")
+//                 .replace("<", "&lt;")
+//                 .replace("\n", "<br/>")
+//         }};
+//     }
+//     macro_rules! to_sorted_string {
+//         ( $o:expr ) => {{
+//             let mut vector = $o.iter().map(|x| to_html!(x)).collect::<Vec<String>>();
+//             vector.sort();
+//             vector.join(", ")
+//         }};
+//     }
 
-    let facts_loader = load_polonius_facts(tcx, def_path);
-    let interner = facts_loader.interner;
-    let borrowck_in_facts = facts_loader.facts;
-    let borrowck_out_facts = Output::compute(&borrowck_in_facts, Algorithm::Naive, true);
+//     let facts_loader = load_polonius_facts(tcx, def_path);
+//     let interner = facts_loader.interner;
+//     let borrowck_in_facts = facts_loader.facts;
+//     let borrowck_out_facts = Output::compute(&borrowck_in_facts, Algorithm::Naive, true);
 
-    use std::io::Write;
-    let graph_path = PathBuf::from(config::log_dir())
-            .join("nll-facts")
-            .join(def_path.to_filename_friendly_no_crate())
-            .join("polonius.dot");
-    let graph_file = std::fs::File::create(graph_path).expect("Unable to create file");
-    let mut graph = std::io::BufWriter::new(graph_file);
+//     use std::io::Write;
+//     let graph_path = PathBuf::from(config::log_dir())
+//             .join("nll-facts")
+//             .join(def_path.to_filename_friendly_no_crate())
+//             .join("polonius.dot");
+//     let graph_file = std::fs::File::create(graph_path).expect("Unable to create file");
+//     let mut graph = std::io::BufWriter::new(graph_file);
 
-    let mut blocks: HashMap<_, _> = HashMap::new();
-    let mut block_edges = HashSet::new();
-    for (from_index, to_index) in borrowck_in_facts.cfg_edge {
-        let from = interner.get_point(from_index);
-        let from_block = from.location.block;
-        let to = interner.get_point(to_index);
-        let to_block = to.location.block;
-        let from_points = blocks.entry(from_block).or_insert(HashSet::new());
-        from_points.insert(from_index);
-        let to_points = blocks.entry(to_block).or_insert(HashSet::new());
-        to_points.insert(to_index);
-        if from_block != to_block {
-            block_edges.insert((from_block, to_block));
-        }
-    }
+//     let mut blocks: HashMap<_, _> = HashMap::new();
+//     let mut block_edges = HashSet::new();
+//     for (from_index, to_index) in borrowck_in_facts.cfg_edge {
+//         let from = interner.get_point(from_index);
+//         let from_block = from.location.block;
+//         let to = interner.get_point(to_index);
+//         let to_block = to.location.block;
+//         let from_points = blocks.entry(from_block).or_insert(HashSet::new());
+//         from_points.insert(from_index);
+//         let to_points = blocks.entry(to_block).or_insert(HashSet::new());
+//         to_points.insert(to_index);
+//         if from_block != to_block {
+//             block_edges.insert((from_block, to_block));
+//         }
+//     }
 
-    write!(graph, "digraph G {{\n")?;
-    write!(graph, "general [ shape=\"record\" ")?;
-    write!(graph, "label =<<table>\n")?;
-    write!(
-        graph,
-        "<tr><td>universal region:</td><td>{}</td></tr>\n",
-        to_sorted_string!(borrowck_in_facts.universal_region)
-    )?;
-    write!(
-        graph,
-        "<tr><td>placeholder:</td><td>{}</td></tr>\n",
-        to_sorted_string!(borrowck_in_facts.placeholder)
-    )?;
-    write!(graph, "</table>>];\n\n")?;
-    for (block, point_indices) in blocks {
-        write!(graph, "node_{:?} [ shape=\"record\" ", block)?;
-        write!(graph, "label =<<table>")?;
-        write!(graph, "<th><td>{:?}</td></th>\n", block)?;
-        write!(graph, "<tr>")?;
-        write!(graph, "<td>point</td>")?;
-        write!(graph, "<td>borrow_live_at</td>")?;
-        write!(graph, "</tr>\n")?;
-        let mut points: Vec<_> = point_indices.iter().map(|index| interner.get_point(*index)).collect();
-        points.sort();
-        for point in points {
-            write!(graph, "<tr>\n")?;
-            write!(graph, "<td>{}</td>\n", point)?;
-            write!(graph, "<td>")?;
-            let point_index = interner.get_point_index(&point);
-            for loan in &borrowck_out_facts.borrow_live_at[&point_index] {
-                write!(graph, "{:?},", loan)?;
-            }
-            write!(graph, "</td>")?;
-            write!(graph, "</tr>\n")?;
-        }
-        write!(graph, "</table>>];\n\n")?;
-    }
-    for (from, to) in block_edges {
-        write!(graph, "node_{:?} -> node_{:?};\n", from, to)?;
-    }
-    write!(graph, "}}\n")?;
-    Ok(())
-}
+//     write!(graph, "digraph G {{\n")?;
+//     write!(graph, "general [ shape=\"record\" ")?;
+//     write!(graph, "label =<<table>\n")?;
+//     write!(
+//         graph,
+//         "<tr><td>universal region:</td><td>{}</td></tr>\n",
+//         to_sorted_string!(borrowck_in_facts.universal_region)
+//     )?;
+//     write!(
+//         graph,
+//         "<tr><td>placeholder:</td><td>{}</td></tr>\n",
+//         to_sorted_string!(borrowck_in_facts.placeholder)
+//     )?;
+//     write!(graph, "</table>>];\n\n")?;
+//     for (block, point_indices) in blocks {
+//         write!(graph, "node_{:?} [ shape=\"record\" ", block)?;
+//         write!(graph, "label =<<table>")?;
+//         write!(graph, "<th><td>{:?}</td></th>\n", block)?;
+//         write!(graph, "<tr>")?;
+//         write!(graph, "<td>point</td>")?;
+//         write!(graph, "<td>borrow_live_at</td>")?;
+//         write!(graph, "</tr>\n")?;
+//         let mut points: Vec<_> = point_indices.iter().map(|index| interner.get_point(*index)).collect();
+//         points.sort();
+//         for point in points {
+//             write!(graph, "<tr>\n")?;
+//             write!(graph, "<td>{}</td>\n", point)?;
+//             write!(graph, "<td>")?;
+//             let point_index = interner.get_point_index(&point);
+//             for loan in &borrowck_out_facts.borrow_live_at[&point_index] {
+//                 write!(graph, "{:?},", loan)?;
+//             }
+//             write!(graph, "</td>")?;
+//             write!(graph, "</tr>\n")?;
+//         }
+//         write!(graph, "</table>>];\n\n")?;
+//     }
+//     for (from, to) in block_edges {
+//         write!(graph, "node_{:?} -> node_{:?};\n", from, to)?;
+//     }
+//     write!(graph, "}}\n")?;
+//     Ok(())
+// }
+
+pub use rustc_mir::consumers::{compute_polonius_facts, BodyWithFacts};
 
 fn load_polonius_facts<'tcx>(
-    _tcx: rustc_middle::ty::TyCtxt<'tcx>,
-    def_path: &rustc_hir::definitions::DefPath,
-) -> facts::FactLoader {
-    let dir_path = PathBuf::from(config::log_dir())
-        .join("nll-facts")
-        .join(def_path.to_filename_friendly_no_crate());
-    debug!("Reading facts from: {:?}", dir_path);
-    let mut facts_loader = facts::FactLoader::new();
-    facts_loader.load_all_facts(&dir_path);
-    facts_loader
+    tcx: rustc_middle::ty::TyCtxt<'tcx>,
+    body: &mir::Body<'tcx>,
+    // def_path: &rustc_hir::definitions::DefPath,
+) -> BodyWithFacts<'tcx> {
+    // let dir_path = PathBuf::from(config::log_dir())
+    //     .join("nll-facts")
+    //     .join(def_path.to_filename_friendly_no_crate());
+    // debug!("Reading facts from: {:?}", dir_path);
+    // let mut facts_loader = facts::FactLoader::new();
+    // facts_loader.load_all_facts(&dir_path);
+    // facts_loader
+    let promoted = IndexVec::new();   // FIXME: This is certainly wrong.
+    compute_polonius_facts(tcx, body, promoted)
 }
 
-pub struct PoloniusInfo<'a, 'tcx: 'a> {
+pub struct PoloniusInfo<'tcx> {
     pub(crate) tcx: ty::TyCtxt<'tcx>,
-    pub(crate) mir: &'a mir::Body<'tcx>,
+    pub(crate) mir: mir::Body<'tcx>,
     pub(crate) borrowck_in_facts: facts::AllInputFacts,
     pub(crate) borrowck_out_facts: facts::AllOutputFacts,
     pub(crate) interner: facts::Interner,
@@ -672,39 +681,42 @@ fn compute_loan_conflict_sets(
     Ok(loan_conflict_sets)
 }
 
-impl<'a, 'tcx: 'a> PoloniusInfo<'a, 'tcx> {
+impl<'tcx> PoloniusInfo<'tcx> {
     pub fn new(
-        procedure: &'a Procedure<'a, 'tcx>,
+        env: &Environment<'tcx>,
+        procedure: &Procedure<'_, 'tcx>,
         _loop_invariant_block: &HashMap<mir::BasicBlock, mir::BasicBlock>,
     ) -> Result<Self, PoloniusInfoError> {
         let tcx = procedure.get_tcx();
         let def_id = procedure.get_id();
-        let mir = procedure.get_mir();
-        let def_path = tcx.hir().def_path(def_id.expect_local());
+        let mir = env.local_base_mir(def_id.expect_local()).clone();
+        // let mir = procedure.get_mir();
+        // let def_path = tcx.hir().def_path(def_id.expect_local());
 
         // Read Polonius facts.
-        let facts_loader = load_polonius_facts(tcx, &def_path);
+        let facts = load_polonius_facts(tcx, &mir);
 
-        // Read relations between region IDs and local variables.
-        let renumber_path = PathBuf::from(config::log_dir())
-            .join("mir")
-            .join(format!(
-                "{}.{}.-------.renumber.0.mir",
-                tcx.crate_name(LOCAL_CRATE),
-                def_path.to_filename_friendly_no_crate()
-            ));
-        debug!("Renumber path: {:?}", renumber_path);
-        let place_regions = regions::load_place_regions(&renumber_path).unwrap();
+        // // Read relations between region IDs and local variables.
+        // let renumber_path = PathBuf::from(config::log_dir())
+        //     .join("mir")
+        //     .join(format!(
+        //         "{}.{}.-------.renumber.0.mir",
+        //         tcx.crate_name(LOCAL_CRATE),
+        //         def_path.to_filename_friendly_no_crate()
+        //     ));
+        // debug!("Renumber path: {:?}", renumber_path);
+        let place_regions = regions::load_place_regions(&facts).unwrap();
 
         let mut call_magic_wands = HashMap::new();
 
-        let mut all_facts = facts_loader.facts;
+        let mut all_facts = facts.input_facts;
+        let interner = facts::Interner::new(facts.location_table);
 
         let real_edges = RealEdges::new(&mir);
         let loop_info = loops::ProcedureLoops::new(&mir, &real_edges);
         let (reference_moves, argument_moves, incompatible_loans) = add_fake_facts(
             &mut all_facts,
-            &facts_loader.interner,
+            &interner,
             tcx,
             &mir,
             &place_regions,
@@ -713,19 +725,18 @@ impl<'a, 'tcx: 'a> PoloniusInfo<'a, 'tcx> {
             PoloniusInfoError::PlaceRegionsError(err, mir.source_info(loc).span)
         )?;
 
-        Self::disconnect_universal_regions(tcx, mir, &place_regions, &mut all_facts)
+        Self::disconnect_universal_regions(tcx, &mir, &place_regions, &mut all_facts)
             .map_err(|(err, loc)| PoloniusInfoError::PlaceRegionsError(err, loc))?;
 
         let output = Output::compute(&all_facts, Algorithm::Naive, true);
         let all_facts_without_back_edges = remove_back_edges(
             all_facts.clone(),
-            &facts_loader.interner,
+            &interner,
             &loop_info.back_edges,
         );
         let output_without_back_edges =
             Output::compute(&all_facts_without_back_edges, Algorithm::Naive, true);
 
-        let interner = facts_loader.interner;
         let loan_position: HashMap<_, _> = all_facts
             .borrow_region
             .iter()
@@ -1013,7 +1024,7 @@ impl<'a, 'tcx: 'a> PoloniusInfo<'a, 'tcx> {
     pub fn get_loans_dying_at(&self, location: mir::Location, zombie: bool) -> Vec<facts::Loan> {
         let borrow_live_at = self.get_borrow_live_at(zombie);
         let successors = self.get_successors(location);
-        let is_return = is_return(self.mir, location);
+        let is_return = is_return(&self.mir, location);
         let mid_point = self.get_point(location, facts::PointType::Mid);
         let becoming_zombie_loans = self
             .additional_facts
@@ -1681,7 +1692,7 @@ impl<'a, 'tcx: 'a> PoloniusInfo<'a, 'tcx> {
         // alive by a reference that was moved into the call and,
         // therefore, its blocking reference is now a zombie.
         let root_die_at_call =
-            { is_call(self.mir, location) && self.find_loan_roots(loans).contains(&loan) };
+            { is_call(&self.mir, location) && self.find_loan_roots(loans).contains(&loan) };
 
         if root_die_at_call || has_incoming_call {
             true

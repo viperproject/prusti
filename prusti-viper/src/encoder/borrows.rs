@@ -6,6 +6,7 @@
 
 use crate::encoder::places;
 use prusti_interface::data::ProcedureDefId;
+use prusti_interface::environment::Environment;
 // use prusti_interface::specifications::{
 //     AssertionKind, SpecificationSet, TypedAssertion, TypedExpression, TypedSpecification,
 //     TypedSpecificationSet,
@@ -419,7 +420,7 @@ impl<'tcx> TypeVisitor<'tcx> for BorrowInfoCollectingVisitor<'tcx> {
 
 pub fn compute_procedure_contract<'p, 'a, 'tcx>(
     proc_def_id: ProcedureDefId,
-    tcx: TyCtxt<'tcx>,
+    env: &Environment<'tcx>,
     specification: typed::SpecificationSet<'tcx>,
     maybe_tymap: Option<&HashMap<ty::Ty<'tcx>, ty::Ty<'tcx>>>,
 ) -> EncodingResult<ProcedureContractMirDef<'tcx>>
@@ -431,6 +432,7 @@ where
 
     let args_ty:Vec<(mir::Local, ty::Ty<'tcx>)>;
     let return_ty;
+    let tcx = env.tcx();
 
     if !tcx.is_closure(proc_def_id) {
         // FIXME: "skip_binder" is most likely wrong
@@ -441,8 +443,7 @@ where
             .collect();
         return_ty = fn_sig.output(); // FIXME: Shouldn't this also go through maybe_tymap?
     } else {
-        let (mir, _) = tcx.mir_promoted(ty::WithOptConstParam::unknown(proc_def_id.expect_local()));
-        let mir = mir.borrow();
+        let mir = env.local_mir(proc_def_id.expect_local());
         // local_decls:
         // _0    - return, with closure's return type
         // _1    - closure's self

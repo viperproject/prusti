@@ -35,14 +35,14 @@ extern crate rustc_attr;
 // #[macro_use]
 // extern crate log;
 // extern crate polonius;
-// extern crate polonius_engine;
+extern crate polonius_engine;
 // extern crate regex;
 // extern crate rustc;
 extern crate rustc_data_structures;
 extern crate rustc_index;
 // extern crate rustc_driver;
 // extern crate rustc_hash;
-// extern crate rustc_mir;
+extern crate rustc_mir;
 // extern crate rustc_target;
 // #[macro_use]
 // extern crate serde;
