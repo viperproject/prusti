@@ -12,6 +12,7 @@ use rustc_middle::mir;
 use rustc_hir::hir_id::HirId;
 use rustc_hir::def_id::{DefId, LocalDefId};
 use rustc_middle::ty::{self, TyCtxt, ParamEnv, WithOptConstParam};
+use rustc_trait_selection::infer::{TyCtxtInferExt, InferCtxtExt};
 use std::path::PathBuf;
 use std::cell::Ref;
 use rustc_span::{Span, MultiSpan, symbol::Symbol};
@@ -273,12 +274,11 @@ impl<'tcx> Environment<'tcx> {
             | ty::TyKind::Opaque(_, subst)
             | ty::TyKind::Generator(_, subst, _)
             | ty::TyKind::Tuple(subst) => {
-                self.tcx.type_implements_trait((
-                    trait_def_id,
-                    ty,
-                    subst,
-                    ParamEnv::empty()
-                )).must_apply_considering_regions()
+                self.tcx.infer_ctxt().enter(|infcx|
+                    infcx
+                        .type_implements_trait(trait_def_id, ty, subst, ParamEnv::empty())
+                        .must_apply_considering_regions()
+                )
             }
             ty::TyKind::Bool => {
                 self.primitive_type_implements_trait(
@@ -354,13 +354,10 @@ impl<'tcx> Environment<'tcx> {
         trait_def_id: DefId
     ) -> bool {
         assert!(impl_def.is_some());
-        self.tcx.type_implements_trait(
-            (
-                trait_def_id,
-                ty,
-                ty::List::empty(),
-                ParamEnv::empty()
-            )
-        ).must_apply_considering_regions()
+        self.tcx.infer_ctxt().enter(|infcx|
+            infcx
+                .type_implements_trait(trait_def_id, ty, ty::List::empty(), ParamEnv::empty())
+                .must_apply_considering_regions()
+        )
     }
 }
