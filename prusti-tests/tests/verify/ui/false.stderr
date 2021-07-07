@@ -1,19 +1,19 @@
 error: [Prusti: verification error] postcondition might not hold.
- --> $DIR/false.rs:7:11
+ --> $DIR/false.rs:8:11
   |
-7 | #[ensures(false)]
+8 | #[ensures(false)]
   |           ^^^^^
   |
 note: the error originates here
- --> $DIR/false.rs:8:1
+ --> $DIR/false.rs:9:1
   |
-8 | fn test1() {}
+9 | fn test1() {}
   | ^^^^^^^^^^^^^
 
 error: [Prusti: verification error] the asserted expression might not hold
-  --> $DIR/false.rs:11:5
+  --> $DIR/false.rs:12:5
    |
-11 |     assert!(false);
+12 |     assert!(false);
    |     ^^^^^^^^^^^^^^^
    |
    = note: this error originates in the macro `assert` (in Nightly builds, run with -Z macro-backtrace for more info)

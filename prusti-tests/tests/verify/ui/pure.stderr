@@ -1,39 +1,39 @@
 error: [Prusti: verification error] the asserted expression might not hold
-  --> $DIR/pure.rs:38:5
+  --> $DIR/pure.rs:39:5
    |
-38 |     assert!(z == 5);
+39 |     assert!(z == 5);
    |     ^^^^^^^^^^^^^^^^
    |
    = note: this error originates in the macro `assert` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error: [Prusti: verification error] postcondition might not hold.
-  --> $DIR/pure.rs:45:9
+  --> $DIR/pure.rs:46:9
    |
-45 |         result == 3     // test that we get correct span information
+46 |         result == 3     // test that we get correct span information
    |         ^^^^^^^^^^^
    |
 note: the error originates here
-  --> $DIR/pure.rs:53:1
+  --> $DIR/pure.rs:54:1
    |
-53 | / fn test_max3() -> i32 {
-54 | |     let a = 4;
-55 | |     let b = 3;
-56 | |     max(a, b)
-57 | | }
+54 | / fn test_max3() -> i32 {
+55 | |     let a = 4;
+56 | |     let b = 3;
+57 | |     max(a, b)
+58 | | }
    | |_^
 
 error: [Prusti: verification error] postcondition might not hold.
-  --> $DIR/pure.rs:66:11
+  --> $DIR/pure.rs:67:11
    |
-66 | #[ensures(result == max(a, b))]
+67 | #[ensures(result == max(a, b))]
    |           ^^^^^^^^^^^^^^^^^^^
    |
 note: the error originates here
-  --> $DIR/pure.rs:67:1
+  --> $DIR/pure.rs:68:1
    |
-67 | / fn test_max5(a: i32, b: i32) -> i32 {
-68 | |     a
-69 | | }
+68 | / fn test_max5(a: i32, b: i32) -> i32 {
+69 | |     a
+70 | | }
    | |_^
 
 error: aborting due to 3 previous errors
