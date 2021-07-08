@@ -21,11 +21,11 @@ pub struct StubProcedureEncoder<'p, 'v: 'p, 'tcx: 'v>
     mir: &'p mir::Body<'tcx>,
     mir_encoder: MirEncoder<'p, 'v, 'tcx>,
     def_id: DefId,
-    procedure: &'p Procedure<'v, 'tcx>,
+    procedure: &'p Procedure<'tcx>,
 }
 
 impl<'p, 'v: 'p, 'tcx: 'v> StubProcedureEncoder<'p, 'v, 'tcx> {
-    pub fn new(encoder: &'p Encoder<'v, 'tcx>, procedure: &'p Procedure<'v, 'tcx>) -> Self {
+    pub fn new(encoder: &'p Encoder<'v, 'tcx>, procedure: &'p Procedure<'tcx>) -> Self {
         let def_id = procedure.get_id();
         trace!("StubProcedureEncoder constructor: {:?}", def_id);
 

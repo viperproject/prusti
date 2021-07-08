@@ -71,7 +71,7 @@ use std::convert::TryInto;
 pub struct ProcedureEncoder<'p, 'v: 'p, 'tcx: 'v> {
     encoder: &'p Encoder<'v, 'tcx>,
     proc_def_id: ProcedureDefId,
-    procedure: &'p Procedure<'p, 'tcx>,
+    procedure: &'p Procedure<'tcx>,
     mir: &'p mir::Body<'tcx>,
     cfg_method: vir::CfgMethod,
     locals: LocalVariableManager<'tcx>,
@@ -115,7 +115,7 @@ pub struct ProcedureEncoder<'p, 'v: 'p, 'tcx: 'v> {
 impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
     pub fn new(
         encoder: &'p Encoder<'v, 'tcx>,
-        procedure: &'p Procedure<'p, 'tcx>
+        procedure: &'p Procedure<'tcx>
     ) -> SpannedEncodingResult<Self> {
         debug!("ProcedureEncoder constructor");
 
@@ -364,7 +364,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
 
         // Load Polonius info
         self.polonius_info = Some(
-            PoloniusInfo::new(&self.procedure, &self.cached_loop_invariant_block)
+            PoloniusInfo::new(self.encoder.env(), &self.procedure, &self.cached_loop_invariant_block)
                 .map_err(|err| self.translate_polonius_error(err))?,
         );
 
@@ -4623,8 +4623,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 kind => unreachable!("Only calls are expected. Found: {:?}", kind),
             }
         } else {
-            let ref_mir = self.encoder.env().local_mir(containing_def_id.expect_local());
-            let mir = ref_mir.borrow();
+            let mir = self.encoder.env().local_mir(containing_def_id.expect_local());
             let return_ty = mir.return_ty();
             let arg_tys = mir.args_iter().map(|arg| mir.local_decls[arg].ty).collect();
             FakeMirEncoder::new(self.encoder, arg_tys, Some(return_ty))

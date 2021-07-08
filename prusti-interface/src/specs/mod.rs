@@ -50,8 +50,9 @@ struct ProcedureSpecRef {
 /// HIR. After the visit, [determine_def_specs] can be used to get back
 /// a mapping of DefIds (which may not be local due to extern specs) to their
 /// [SpecificationSet], i.e. procedures, loop invariants, and structs.
-pub struct SpecCollector<'tcx> {
+pub struct SpecCollector<'a, 'tcx: 'a> {
     tcx: TyCtxt<'tcx>,
+    env: &'a Environment<'tcx>,
     extern_resolver: ExternSpecResolver<'tcx>,
 
     /// Collected assertions before deserialisation.
@@ -67,16 +68,17 @@ pub struct SpecCollector<'tcx> {
     loop_specs: HashMap<LocalDefId, Vec<SpecificationId>>,
 }
 
-impl<'tcx> SpecCollector<'tcx> {
-    pub fn new(tcx: TyCtxt<'tcx>) -> Self {
+impl<'a, 'tcx> SpecCollector<'a, 'tcx> {
+    pub fn new(env: &'a Environment<'tcx>) -> Self {
         Self {
-            tcx: tcx,
+            tcx: env.tcx(),
+            env,
             spec_items: Vec::new(),
             typed_specs: HashMap::new(),
             procedure_specs: HashMap::new(),
             loop_specs: HashMap::new(),
             typed_expressions: HashMap::new(),
-            extern_resolver: ExternSpecResolver::new(tcx),
+            extern_resolver: ExternSpecResolver::new(env.tcx()),
         }
     }
 
@@ -88,7 +90,7 @@ impl<'tcx> SpecCollector<'tcx> {
                 let assertion = reconstruct_typed_assertion(
                     spec_item.specification,
                     &self.typed_expressions,
-                    self.tcx
+                    self.env
                 );
                 (spec_item.spec_id, assertion)
             })
@@ -239,9 +241,9 @@ fn get_procedure_spec_ids(def_id: DefId, attrs: &[ast::Attribute]) -> Option<Pro
 fn reconstruct_typed_assertion<'tcx>(
     assertion: JsonAssertion,
     typed_expressions: &HashMap<String, LocalDefId>,
-    tcx: TyCtxt<'tcx>
+    env: &Environment<'tcx>
 ) -> typed::Assertion<'tcx> {
-    assertion.to_typed(typed_expressions, tcx)
+    assertion.to_typed(typed_expressions, env)
 }
 
 fn deserialize_spec_from_attrs(attrs: &[ast::Attribute]) -> JsonAssertion {
@@ -250,7 +252,7 @@ fn deserialize_spec_from_attrs(attrs: &[ast::Attribute]) -> JsonAssertion {
     JsonAssertion::from_json_string(&json_string)
 }
 
-impl<'tcx> intravisit::Visitor<'tcx> for SpecCollector<'tcx> {
+impl<'a, 'tcx> intravisit::Visitor<'tcx> for SpecCollector<'a, 'tcx> {
     type Map = Map<'tcx>;
 
     fn nested_visit_map(&mut self) -> intravisit::NestedVisitorMap<Self::Map> {

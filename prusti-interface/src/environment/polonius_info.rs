@@ -44,6 +44,7 @@ use super::mir_analyses::initialization::DefinitelyInitializedAnalysisResult;
 use super::mir_analyses::liveness::compute_liveness;
 use super::mir_analyses::liveness::LivenessAnalysisResult;
 use super::procedure::Procedure;
+use super::Environment;
 use prusti_common::config;
 use crate::environment::mir_utils::RealEdges;
 
@@ -371,23 +372,6 @@ pub enum PoloniusInfoError {
 //     Ok(())
 // }
 
-pub use rustc_mir::consumers::{compute_polonius_facts, BodyWithFacts};
-
-fn load_polonius_facts<'tcx>(
-    tcx: rustc_middle::ty::TyCtxt<'tcx>,
-    body: &mir::Body<'tcx>,
-    // def_path: &rustc_hir::definitions::DefPath,
-) -> BodyWithFacts<'tcx> {
-    // let dir_path = PathBuf::from(config::log_dir())
-    //     .join("nll-facts")
-    //     .join(def_path.to_filename_friendly_no_crate());
-    // debug!("Reading facts from: {:?}", dir_path);
-    // let mut facts_loader = facts::FactLoader::new();
-    // facts_loader.load_all_facts(&dir_path);
-    // facts_loader
-    let promoted = IndexVec::new();   // FIXME: This is certainly wrong.
-    compute_polonius_facts(tcx, body, promoted)
-}
 
 pub struct PoloniusInfo<'a, 'tcx: 'a> {
     pub(crate) tcx: ty::TyCtxt<'tcx>,
@@ -682,7 +666,8 @@ fn compute_loan_conflict_sets(
 
 impl<'a, 'tcx: 'a> PoloniusInfo<'a, 'tcx> {
     pub fn new(
-        procedure: &'a Procedure<'a, 'tcx>,
+        env: &'a Environment<'tcx>,
+        procedure: &'a Procedure<'tcx>,
         _loop_invariant_block: &HashMap<mir::BasicBlock, mir::BasicBlock>,
     ) -> Result<Self, PoloniusInfoError> {
         let tcx = procedure.get_tcx();
@@ -691,7 +676,7 @@ impl<'a, 'tcx: 'a> PoloniusInfo<'a, 'tcx> {
         let def_path = tcx.hir().def_path(def_id.expect_local());
 
         // Read Polonius facts.
-        let facts = load_polonius_facts(tcx, mir);
+        let facts = env.local_mir_borrowck_facts(def_id.expect_local());
 
         // // Read relations between region IDs and local variables.
         // let renumber_path = PathBuf::from(config::log_dir())
@@ -702,12 +687,12 @@ impl<'a, 'tcx: 'a> PoloniusInfo<'a, 'tcx> {
         //         def_path.to_filename_friendly_no_crate()
         //     ));
         // debug!("Renumber path: {:?}", renumber_path);
-        let place_regions = regions::load_place_regions(&facts).unwrap();
+        let place_regions = regions::load_place_regions(mir, &*facts).unwrap();
 
         let mut call_magic_wands = HashMap::new();
 
-        let mut all_facts = facts.input_facts;
-        let interner = facts::Interner::new(facts.location_table);
+        let mut all_facts = facts.input_facts.take().unwrap();
+        let interner = facts::Interner::new(facts.location_table.take().unwrap());
 
         let real_edges = RealEdges::new(&mir);
         let loop_info = loops::ProcedureLoops::new(&mir, &real_edges);

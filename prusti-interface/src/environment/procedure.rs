@@ -10,6 +10,7 @@ use rustc_middle::mir::{self, Body as Mir, Rvalue, AggregateKind};
 use rustc_middle::mir::{BasicBlock, BasicBlockData, Terminator, TerminatorKind};
 use rustc_middle::ty::{self, Ty, TyCtxt};
 use std::cell::Ref;
+use std::rc::Rc;
 use std::collections::{HashSet, HashMap};
 use rustc_span::Span;
 use log::{trace, debug};
@@ -17,28 +18,29 @@ use rustc_middle::mir::StatementKind;
 use rustc_hir::def_id;
 use std::iter::FromIterator;
 use crate::environment::mir_utils::RealEdges;
+use crate::environment::Environment;
 
 /// Index of a Basic Block
 pub type BasicBlockIndex = mir::BasicBlock;
 
 /// A facade that provides information about the Rust procedure.
-pub struct Procedure<'a, 'tcx: 'a> {
+pub struct Procedure<'tcx> {
     tcx: TyCtxt<'tcx>,
     proc_def_id: ProcedureDefId,
-    mir: Ref<'a, Mir<'tcx>>,
+    mir: Rc<Mir<'tcx>>,
     real_edges: RealEdges,
     loop_info: loops::ProcedureLoops,
     reachable_basic_blocks: HashSet<BasicBlock>,
     nonspec_basic_blocks: HashSet<BasicBlock>,
 }
 
-impl<'a, 'tcx> Procedure<'a, 'tcx> {
+impl<'tcx> Procedure<'tcx> {
     /// Builds an implementation of the Procedure interface, given a typing context and the
     /// identifier of a procedure
-    pub fn new(tcx: TyCtxt<'tcx>, proc_def_id: ProcedureDefId) -> Self {
+    pub fn new(env: &Environment<'tcx>, proc_def_id: ProcedureDefId) -> Self {
         trace!("Encoding procedure {:?}", proc_def_id);
-        let (mir, _) = tcx.mir_promoted(ty::WithOptConstParam::unknown(proc_def_id.expect_local()));
-        let mir = mir.borrow();
+        let tcx = env.tcx();
+        let mir = env.local_mir(proc_def_id.expect_local());
         let real_edges = RealEdges::new(&mir);
         let reachable_basic_blocks = build_reachable_basic_blocks(&mir, &real_edges);
         let nonspec_basic_blocks = build_nonspec_basic_blocks(&mir, &real_edges, &tcx);

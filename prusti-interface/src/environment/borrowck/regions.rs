@@ -7,7 +7,7 @@
 ///! Code for finding `rustc::ty::sty::RegionVid` associated with local
 ///! reference typed variables.
 
-pub use rustc_mir::consumers::{compute_polonius_facts, BodyWithFacts};
+use rustc_mir::consumers::BodyWithBorrowckFacts;
 
 use std::collections::HashMap;
 use std::fs::File;
@@ -134,11 +134,10 @@ fn extract_region(place_regions: &mut PlaceRegions, local: mir::Local, ty: ty::T
     }
 }
 
-pub fn load_place_regions(info: &BodyWithFacts) -> io::Result<PlaceRegions> {
+pub fn load_place_regions(body: &mir::Body<'_>, facts: &facts::BorrowckFacts) -> io::Result<PlaceRegions> {
     trace!("[enter] load_place_regions()");
     let mut place_regions = PlaceRegions::new();
 
-    let body = &info.body;
     for (local, local_decl) in body.local_decls.iter_enumerated() {
         let ty = local_decl.ty;
         debug!("local: {:?} {:?}", local, ty);

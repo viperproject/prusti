@@ -25,7 +25,7 @@ pub enum SpecFunctionKind {
 
 pub struct SpecFunctionEncoder<'p, 'v: 'p, 'tcx: 'v> {
     encoder: &'p Encoder<'v, 'tcx>,
-    procedure: &'p Procedure<'p, 'tcx>,
+    procedure: &'p Procedure<'tcx>,
     span: Span,
     proc_def_id: ProcedureDefId,
     is_closure: bool,
@@ -35,7 +35,7 @@ pub struct SpecFunctionEncoder<'p, 'v: 'p, 'tcx: 'v> {
 
 impl<'p, 'v: 'p, 'tcx: 'v> SpecFunctionEncoder<'p, 'v, 'tcx> {
     pub fn new(encoder: &'p Encoder<'v, 'tcx>,
-               procedure: &'p Procedure<'p, 'tcx>) -> Self {
+               procedure: &'p Procedure<'tcx>) -> Self {
         Self {
             encoder: encoder,
             procedure: procedure,
@@ -61,7 +61,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> SpecFunctionEncoder<'p, 'v, 'tcx> {
 
         let contract = compute_procedure_contract(
             self.proc_def_id,
-            self.encoder.env().tcx(),
+            self.encoder.env(),
             typed::SpecificationSet::Procedure(specs),
             Some(&self.encoder.current_tymap())
         ).with_span(self.span)?.to_def_site_contract();

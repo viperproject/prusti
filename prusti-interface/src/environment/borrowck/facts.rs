@@ -9,6 +9,8 @@ use std::panic::Location;
 use polonius_engine::FactTypes;
 use rustc_mir::consumers::{RustcFacts, LocationTable, RichLocation};
 use rustc_middle::mir;
+use std::rc::Rc;
+use std::cell::RefCell;
 
 pub type Region = <RustcFacts as FactTypes>::Origin;
 pub type Loan = <RustcFacts as FactTypes>::Loan;
@@ -29,6 +31,15 @@ impl LocationTableExt for LocationTable {
             RichLocation::Start(location) | RichLocation::Mid(location) => location,
         }
     }
+}
+
+pub struct BorrowckFacts {
+    /// Polonius input facts.
+    pub input_facts: RefCell<Option<AllInputFacts>>,
+    /// Polonius output facts.
+    pub output_facts: Rc<AllOutputFacts>,
+    /// The table that maps Polonius points to locations in the table.
+    pub location_table: RefCell<Option<LocationTable>>,
 }
 
 // /// Code for loading an manipulating Polonius facts.
