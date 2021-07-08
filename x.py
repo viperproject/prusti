@@ -56,16 +56,30 @@ def get_linux_env():
         ('JAVA_HOME', java_home),
         ('RUST_TEST_THREADS', '1'),
     ]
-    if os.path.exists(java_home):
-        ld_library_path = None
-        for root, _, files in os.walk(java_home):
-            if 'libjvm.so' in files:
-                ld_library_path = root
-                break
-        if ld_library_path is None:
-            report("could not find libjvm.so in {}", java_home)
-        else:
-            variables.append(('LD_LIBRARY_PATH', ld_library_path))
+    # if os.path.exists(java_home):
+        # ld_library_path = None
+        # for root, _, files in os.walk(java_home):
+            # if 'libjvm.so' in files:
+                # ld_library_path = root
+                # break
+        # if ld_library_path is None:
+            # report("could not find libjvm.so in {}", java_home)
+        # else:
+            # variables.append(('LD_LIBRARY_PATH', ld_library_path))
+
+    variables.append((
+        'RUST_SYSROOT',
+        # '/home/data/eth/rust/rustc/build/x86_64-unknown-linux-gnu/stage1-rustc/x86_64-unknown-linux-gnu/release/deps/'
+        # '/home/data/eth/rust/rustc/build/x86_64-unknown-linux-gnu/stage0-rustc/x86_64-unknown-linux-gnu/release/'
+        '/home/data/eth/rust/rustc/build/x86_64-unknown-linux-gnu/stage1'
+    ))
+    variables.append((
+        'RUSTC', '/home/data/eth/rust/rustc/build/x86_64-unknown-linux-gnu/stage1/bin/rustc'
+    ))
+    variables.append((
+        'LD_LIBRARY_PATH',
+        '/usr/lib/jvm/default-java/lib/server:/home/data/eth/rust/rustc/build/x86_64-unknown-linux-gnu/stage1/lib/rustlib/x86_64-unknown-linux-gnu/lib/'
+    ))
     viper_home = get_var_or('VIPER_HOME', os.path.abspath('viper_tools/server'))
     if os.path.exists(viper_home):
         variables.append(('VIPER_HOME', viper_home))

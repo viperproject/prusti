@@ -77,6 +77,8 @@ impl rustc_driver::Callbacks for PrustiCompilerCalls {
             }
             if !config::no_verify() {
                 verify(env, def_spec);
+            } else if config::dump_lifetime_info() {
+                env.dump_lifetime_info();
             }
         });
 

@@ -76,6 +76,7 @@ lazy_static! {
         settings.set_default("dump_path_ctxt_in_debug_info", false).unwrap();
         settings.set_default("dump_reborrowing_dag_in_debug_info", false).unwrap();
         settings.set_default("dump_borrowck_info", false).unwrap();
+        settings.set_default("dump_lifetime_info", false).unwrap();
         settings.set_default("dump_viper_program", false).unwrap();
         settings.set_default("foldunfold_state_filter", "").unwrap();
         settings.set_default("contracts_lib", "").unwrap();
@@ -215,6 +216,11 @@ pub fn dump_reborrowing_dag_in_debug_info() -> bool {
 /// Should we dump borrowck info?
 pub fn dump_borrowck_info() -> bool {
     read_setting("dump_borrowck_info")
+}
+
+/// Should we dump info about lifetimes?
+pub fn dump_lifetime_info() -> bool {
+    read_setting("dump_lifetime_info")
 }
 
 /// Should we dump the Viper program?

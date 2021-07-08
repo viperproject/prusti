@@ -17,7 +17,7 @@ use log::trace;
 use polonius_engine::Algorithm;
 use polonius_engine::Atom;
 use polonius_engine::Output;
-use rustc_hash::FxHashMap;
+use rustc_data_structures::fx::FxHashMap;
 use rustc_index::vec::Idx;
 use rustc_middle::mir;
 use rustc_middle::ty;

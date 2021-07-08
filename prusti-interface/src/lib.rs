@@ -29,13 +29,15 @@ extern crate rustc_middle;
 extern crate rustc_span;
 extern crate rustc_ast;
 extern crate rustc_attr;
+extern crate rustc_infer;
+extern crate rustc_mir;
 
 // extern crate csv;
 // extern crate datafrog;
 // #[macro_use]
 // extern crate log;
 // extern crate polonius;
-// extern crate polonius_engine;
+extern crate polonius_engine;
 // extern crate regex;
 // extern crate rustc;
 extern crate rustc_data_structures;

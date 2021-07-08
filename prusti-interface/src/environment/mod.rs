@@ -19,9 +19,11 @@ use std::collections::HashSet;
 use log::debug;
 
 pub mod borrowck;
+pub mod borrowck2;
 mod collect_prusti_spec_visitor;
 mod collect_closure_defs_visitor;
 mod dump_borrowck_info;
+mod dump_lifetime_info;
 mod loops;
 mod loops_utils;
 pub mod mir_analyses;
@@ -179,6 +181,13 @@ impl<'tcx> Environment<'tcx> {
         if prusti_common::config::dump_borrowck_info() {
             dump_borrowck_info::dump_borrowck_info(self.tcx(), procedures)
         }
+    }
+
+    /// Dump various information about the lifetimes in `optimized_mir`.
+    ///
+    /// Used for experiments.
+    pub fn dump_lifetime_info(&self) {
+        dump_lifetime_info::dump_lifetime_info(self.tcx());
     }
 
     /// Get an absolute `def_path`. Note: not preserved across compilations!
