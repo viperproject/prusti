@@ -157,7 +157,6 @@ fn main() {
         env::set_var("POLONIUS_ALGORITHM", "Naive");
         rustc_args.push("-Zborrowck=mir".to_owned());
         rustc_args.push("-Zpolonius".to_owned());
-        rustc_args.push("-Znll-facts".to_owned());
         rustc_args.push(format!(
             "-Znll-facts-dir={}",
             PathBuf::from(config::log_dir()).join("nll-facts").to_str()
@@ -169,7 +168,6 @@ fn main() {
             PathBuf::from(config::log_dir()).join("mir").to_str()
                 .expect("failed to configure dump-mir-dir")
         ));
-        rustc_args.push("-Zdump-mir=renumber".to_owned());
         rustc_args.push("-Zalways-encode-mir".to_owned());
         rustc_args.push("-Zcrate-attr=feature(register_tool)".to_owned());
         rustc_args.push("-Zcrate-attr=register_tool(prusti)".to_owned());
