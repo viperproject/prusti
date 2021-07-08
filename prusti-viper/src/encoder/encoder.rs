@@ -863,6 +863,7 @@ impl<'v, 'tcx> Encoder<'v, 'tcx> {
     /// by either being a primitive type or by deriving the Eq trait.
     pub fn has_structural_eq_impl(&self, ty: ty::Ty<'tcx>) -> bool {
         let ty = ty.peel_refs();
+        let ty = self.env().tcx().erase_regions_ty(ty);
         match ty.kind() {
             ty::TyKind::Bool
             | ty::TyKind::Int(_)
