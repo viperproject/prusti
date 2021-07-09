@@ -69,4 +69,27 @@ impl<'a> AstFactory<'a> {
             .unwrap_result(ast::SeqType::with(self.env).new(element_type.to_jobject()));
         Type::new(obj)
     }
+
+    pub fn backend_f32_type(&self) -> Type<'a> {
+        let rm = ast::utility::RoundingMode::with(self.env).call_RNE().unwrap();
+        let float_factory_ = ast::utility::FloatFactory::with(self.env);
+        let float_factory = ast::utility::FloatFactory::new(&float_factory_, 24, 8, rm).unwrap();
+        
+        let obj = self
+            .jni
+            .unwrap_result(ast::utility::FloatFactory::call_typ(&float_factory_, float_factory));
+        Type::new(obj)
+    }
+
+    pub fn backend_f64_type(&self) -> Type<'a> {
+        let rm = ast::utility::RoundingMode::with(self.env).call_RNE().unwrap();
+        let float_factory_ = ast::utility::FloatFactory::with(self.env);
+        let float_factory = ast::utility::FloatFactory::new(&float_factory_, 52, 12, rm).unwrap();
+        
+        let obj = self
+            .jni
+            .unwrap_result(ast::utility::FloatFactory::call_typ(&float_factory_, float_factory));
+        Type::new(obj)
+    }
+
 }

@@ -5,7 +5,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use super::super::borrows::Borrow;
-use crate::vir::ast::*;
+use crate::vir::{ast::*, FloatSize::*};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::hash::{Hash, Hasher};
@@ -73,6 +73,7 @@ pub enum PlaceComponent {
 pub enum UnaryOpKind {
     Not,
     Minus,
+    IsNaN,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -90,6 +91,8 @@ pub enum BinOpKind {
     Mod,
     And,
     Or,
+    Min,
+    Max,
     Implies,
 }
 
@@ -100,10 +103,17 @@ pub enum ContainerOpKind {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum FloatConst {
+    FloatConst64(u64),
+    FloatConst32(u32),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Const {
     Bool(bool),
     Int(i64),
     BigInt(String),
+    Float(FloatConst),
     /// All function pointers share the same constant, because their function
     /// is determined by the type system.
     FnPtr,
@@ -249,6 +259,7 @@ impl fmt::Display for UnaryOpKind {
         match self {
             UnaryOpKind::Not => write!(f, "!"),
             UnaryOpKind::Minus => write!(f, "-"),
+            UnaryOpKind::IsNaN => write!(f, "is_nan")
         }
     }
 }
@@ -269,7 +280,9 @@ impl fmt::Display for BinOpKind {
             BinOpKind::Mod => write!(f, "%"),
             BinOpKind::And => write!(f, "&&"),
             BinOpKind::Or => write!(f, "||"),
-            BinOpKind::Implies => write!(f, "==>"),
+            BinOpKind::Min => write!(f, "min"),
+            BinOpKind::Max => write!(f, "max"),
+            BinOpKind::Implies => write!(f, "==>"),            
         }
     }
 }
@@ -280,6 +293,8 @@ impl fmt::Display for Const {
             Const::Bool(val) => write!(f, "{}", val),
             Const::Int(val) => write!(f, "{}", val),
             Const::BigInt(ref val) => write!(f, "{}", val),
+            Const::Float(FloatConst::FloatConst32(val)) => write!(f, "{}", val),
+            Const::Float(FloatConst::FloatConst64(val)) => write!(f, "{}", val),
             Const::FnPtr => write!(f, "FnPtr"),
         }
     }
@@ -305,10 +320,10 @@ impl Expr {
             | Expr::LetExpr(_, _, _, p)
             | Expr::FuncApp(_, _, _, _, p)
             | Expr::DomainFuncApp(_, _, p)
-            | Expr::InhaleExhale(_, _, p)
             | Expr::ContainerOp(_, _, _, p)
             | Expr::Seq(_, _, p)
-            | Expr::SnapApp(_, p) => *p,
+            | Expr::SnapApp(_, p)
+            | Expr::InhaleExhale(_, _, p) => *p,
             // TODO Expr::DomainFuncApp(_, _, _, _, _, p) => p,
             Expr::Downcast(box ref base, ..) => base.pos(),
         }
@@ -396,6 +411,10 @@ impl Expr {
         Expr::UnaryOp(UnaryOpKind::Minus, box expr, Position::default())
     }
 
+    pub fn is_nan(e: Expr) -> Self{
+        Expr::UnaryOp(UnaryOpKind::IsNaN, box e, Position::default())
+    }
+
     pub fn gt_cmp(left: Expr, right: Expr) -> Self {
         Expr::BinOp(BinOpKind::GtCmp, box left, box right, Position::default())
     }
@@ -469,6 +488,14 @@ impl Expr {
 
     pub fn xor(left: Expr, right: Expr) -> Self {
         Expr::not(Expr::eq_cmp(left, right))
+    }
+
+    pub fn min(e1: Expr, e2: Expr) -> Self{
+        Expr::BinOp(BinOpKind::Min, box e1, box e2, Position::default())
+    }
+
+    pub fn max(e1: Expr, e2: Expr) -> Self{
+        Expr::BinOp(BinOpKind::Max, box e1, box e2, Position::default())
     }
 
     pub fn implies(left: Expr, right: Expr) -> Self {
@@ -1031,6 +1058,8 @@ impl Expr {
                 match constant {
                     Const::Bool(..) => &Type::Bool,
                     Const::Int(..) | Const::BigInt(..) => &Type::Int,
+                    Const::Float(FloatConst::FloatConst32(_)) => &Type::Float(F32),
+                    Const::Float(FloatConst::FloatConst64(_)) => &Type::Float(F64),
                     Const::FnPtr => &FN_PTR_TYPE,
                 }
             }
@@ -1049,7 +1078,9 @@ impl Expr {
                     BinOpKind::Sub |
                     BinOpKind::Mul |
                     BinOpKind::Div |
-                    BinOpKind::Mod => {
+                    BinOpKind::Mod |
+                    BinOpKind::Min |
+                    BinOpKind::Max => {
                         let typ1 = base1.get_type();
                         let typ2 = base2.get_type();
                         assert_eq!(typ1, typ2, "expr: {:?}", self);

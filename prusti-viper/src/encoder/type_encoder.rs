@@ -12,7 +12,7 @@ use prusti_common::{
     config,
     vir,
     vir_local,
-    vir::{ExprIterator, ExprFolder},
+    vir::{ExprIterator, ExprFolder, FloatSize},
 };
 // use prusti_interface::specifications::*;
 // use rustc::middle::const_val::ConstVal;
@@ -54,6 +54,7 @@ impl<'p, 'v, 'r: 'v, 'tcx: 'v> TypeEncoder<'p, 'v, 'tcx> {
             | ty::TyKind::Tuple(_)
             | ty::TyKind::Never
             | ty::TyKind::Param(_) => true,
+            | ty::TyKind::Float(_) => true,
             _ => false,
         }
     }
@@ -141,6 +142,12 @@ impl<'p, 'v, 'r: 'v, 'tcx: 'v> TypeEncoder<'p, 'v, 'tcx> {
                 return Err(EncodingError::internal(
                     "TypeEncoder::encode_value_field should not be called for arrays"
                 ));
+            }
+            ty::TyKind::Float(t) => {
+                match t {
+                    rustc_middle::ty::FloatTy::F32 => vir::Field::new("val_float32", vir::Type::Float(FloatSize::F32)),
+                    rustc_middle::ty::FloatTy::F64 => vir::Field::new("val_float64", vir::Type::Float(FloatSize::F64)),
+                }
             }
 
             ty::TyKind::Float(_) => {
@@ -308,6 +315,15 @@ impl<'p, 'v, 'r: 'v, 'tcx: 'v> TypeEncoder<'p, 'v, 'tcx> {
                     self.encoder.encode_value_field(self.ty)?,
                     bounds,
                     unsigned,
+                )]
+            }
+
+            ty::TyKind::Float(_) => {
+                vec![vir::Predicate::new_primitive_value(
+                    typ,
+                    self.encoder.encode_value_field(self.ty)?,
+                    None,
+                    false,
                 )]
             }
 
@@ -502,6 +518,9 @@ impl<'p, 'v, 'r: 'v, 'tcx: 'v> TypeEncoder<'p, 'v, 'tcx> {
             ty::TyKind::Uint(ty::UintTy::U64) => "u64".to_string(),
             ty::TyKind::Uint(ty::UintTy::U128) => "u128".to_string(),
             ty::TyKind::Uint(ty::UintTy::Usize) => "usize".to_string(),
+
+            ty::TyKind::Float(ty::FloatTy::F32) => "f32".to_string(),
+            ty::TyKind::Float(ty::FloatTy::F64) => "f64".to_string(),
 
             ty::TyKind::Char => "char".to_string(),
 

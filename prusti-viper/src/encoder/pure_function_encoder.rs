@@ -1026,7 +1026,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> BackwardMirInterpreter<'tcx>
                     | ty::TyKind::Int(..)
                     | ty::TyKind::Uint(..)
                     | ty::TyKind::RawPtr(..)
-                    | ty::TyKind::Ref(..) => Some(
+                    | ty::TyKind::Ref(..) 
+                    | ty::TyKind::Float(..) => Some(
                         self.encoder.encode_value_expr(
                             encoded_lhs.clone(),
                             ty
@@ -1375,7 +1376,8 @@ fn is_supported_type_of_pure_expression<'tcx>(tcx: ty::TyCtxt<'tcx>, ty: ty::Ty<
         ty::TyKind::Bool
         | ty::TyKind::Int(_)
         | ty::TyKind::Uint(_)
-        | ty::TyKind::Char => true,
+        | ty::TyKind::Char 
+        | ty::Float(_) => true,
 
         ty::TyKind::Tuple(elems) => {
             elems.types().all(|t| is_supported_type_of_pure_expression(tcx, t))

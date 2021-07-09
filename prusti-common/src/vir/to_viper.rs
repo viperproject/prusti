@@ -5,7 +5,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use crate::config;
-use viper::{self, AstFactory};
+use viper::{self, AstFactory, UnOpFloat, BinOpFloat, FloatSizeViper};
 use crate::vir::{ast::*, borrows::borrow_id, Program};
 
 pub trait ToViper<'v, T> {
@@ -78,7 +78,9 @@ impl<'v> ToViper<'v, viper::Type<'v>> for Type {
             Type::TypedRef(_) => ast.ref_type(),
             Type::Domain(ref name) => ast.domain_type(&name, &[], &[]),
             Type::Snapshot(ref name) => ast.domain_type(&format!("Snap${}", name), &[], &[]),
-            Type::Seq(ref elem_ty) => ast.seq_type(elem_ty.to_viper(ast))
+            Type::Seq(ref elem_ty) => ast.seq_type(elem_ty.to_viper(ast)),
+            Type::Float(FloatSize::F32) => ast.backend_f32_type(),
+            Type::Float(FloatSize::F64) => ast.backend_f64_type(),
         }
     }
 }
@@ -341,52 +343,73 @@ impl<'v> ToViper<'v, viper::Expr<'v>> for Expr {
                     perm.to_viper(ast),
                     pos.to_viper(ast),
                 ),
-            Expr::UnaryOp(op, ref expr, ref pos) => match op {
-                UnaryOpKind::Not => ast.not_with_pos(expr.to_viper(ast), pos.to_viper(ast)),
-                UnaryOpKind::Minus => ast.minus_with_pos(expr.to_viper(ast), pos.to_viper(ast)),
+            Expr::UnaryOp(op, ref expr, ref pos) => match expr.get_type() {
+                Type::Float(float_ty) => {
+                    let f_size = match float_ty {
+                        FloatSize::F32 => viper::FloatSizeViper::F32,
+                        FloatSize::F64 => viper::FloatSizeViper::F64,
+                    };
+                    let op_kind = match op {
+                        UnaryOpKind::Minus => UnOpFloat::Neg,
+                        UnaryOpKind::IsNaN => UnOpFloat::IsNan,
+                        _ => unimplemented!("unimplemented unop for floats")
+                    };
+                    ast.float_unop(op_kind, f_size, expr.to_viper(ast))
+                }
+
+                _ => match op {
+                    UnaryOpKind::Not => ast.not_with_pos(expr.to_viper(ast), pos.to_viper(ast)),
+                    UnaryOpKind::Minus => ast.minus_with_pos(expr.to_viper(ast), pos.to_viper(ast)),
+                    _ => unimplemented!("is_nan not a valid unary operation for this type")
+                }
             },
             Expr::BinOp(op, ref left, ref right, ref pos) => match op {
-                BinOpKind::EqCmp => {
-                    ast.eq_cmp_with_pos(left.to_viper(ast), right.to_viper(ast), pos.to_viper(ast))
-                }
-                BinOpKind::NeCmp => {
-                    ast.ne_cmp_with_pos(left.to_viper(ast), right.to_viper(ast), pos.to_viper(ast))
-                }
-                BinOpKind::GtCmp => {
-                    ast.gt_cmp_with_pos(left.to_viper(ast), right.to_viper(ast), pos.to_viper(ast))
-                }
-                BinOpKind::GeCmp => {
-                    ast.ge_cmp_with_pos(left.to_viper(ast), right.to_viper(ast), pos.to_viper(ast))
-                }
-                BinOpKind::LtCmp => {
-                    ast.lt_cmp_with_pos(left.to_viper(ast), right.to_viper(ast), pos.to_viper(ast))
-                }
-                BinOpKind::LeCmp => {
-                    ast.le_cmp_with_pos(left.to_viper(ast), right.to_viper(ast), pos.to_viper(ast))
-                }
-                BinOpKind::Add => {
-                    ast.add_with_pos(left.to_viper(ast), right.to_viper(ast), pos.to_viper(ast))
-                }
-                BinOpKind::Sub => {
-                    ast.sub_with_pos(left.to_viper(ast), right.to_viper(ast), pos.to_viper(ast))
-                }
-                BinOpKind::Mul => {
-                    ast.mul_with_pos(left.to_viper(ast), right.to_viper(ast), pos.to_viper(ast))
-                }
-                BinOpKind::Div => {
-                    ast.div_with_pos(left.to_viper(ast), right.to_viper(ast), pos.to_viper(ast))
-                }
-                BinOpKind::Mod => {
-                    ast.module_with_pos(left.to_viper(ast), right.to_viper(ast), pos.to_viper(ast))
-                }
-                BinOpKind::And => {
-                    ast.and_with_pos(left.to_viper(ast), right.to_viper(ast), pos.to_viper(ast))
-                }
-                BinOpKind::Or => {
-                    ast.or_with_pos(left.to_viper(ast), right.to_viper(ast), pos.to_viper(ast))
-                }
-                BinOpKind::Implies => {
-                    ast.implies_with_pos(left.to_viper(ast), right.to_viper(ast), pos.to_viper(ast))
+                BinOpKind::EqCmp | BinOpKind::NeCmp | BinOpKind::GtCmp | BinOpKind::GeCmp | BinOpKind::LtCmp | BinOpKind::LeCmp
+                | BinOpKind::Add | BinOpKind::Sub | BinOpKind::Mul | BinOpKind::Div | BinOpKind::Min | BinOpKind::Max => {
+                    match left.get_type() {
+                        Type::Float(float_ty) => {
+                            let f_size = match float_ty {
+                                FloatSize::F32 => viper::FloatSizeViper::F32,
+                                FloatSize::F64 => viper::FloatSizeViper::F64,
+                            };
+                            let op_kind = match op {
+                                BinOpKind::Add => viper::BinOpFloat::Add,
+                                BinOpKind::Sub => viper::BinOpFloat::Sub,
+                                BinOpKind::Mul => viper::BinOpFloat::Mul,
+                                BinOpKind::Div => viper::BinOpFloat::Div,
+                                BinOpKind::EqCmp => viper::BinOpFloat::Eq,
+                                BinOpKind::GtCmp => viper::BinOpFloat::Gt,
+                                BinOpKind::GeCmp => viper::BinOpFloat::Geq,
+                                BinOpKind::LtCmp => viper::BinOpFloat::Lt,
+                                BinOpKind::LeCmp => viper::BinOpFloat::Leq,
+                                BinOpKind::Min => viper::BinOpFloat::Min,
+                                BinOpKind::Max => viper::BinOpFloat::Max,
+                                _ => unimplemented!("unimplemented binop for floats")
+                            };
+                            ast.float_binop(op_kind, f_size, left.to_viper(ast), right.to_viper(ast))
+                        }
+                        _ => match op {
+                            BinOpKind::EqCmp => ast.eq_cmp_with_pos(left.to_viper(ast), right.to_viper(ast), pos.to_viper(ast)),
+                            BinOpKind::NeCmp => ast.ne_cmp_with_pos(left.to_viper(ast), right.to_viper(ast), pos.to_viper(ast)),
+                            BinOpKind::GtCmp => ast.gt_cmp_with_pos(left.to_viper(ast), right.to_viper(ast), pos.to_viper(ast)),
+                            BinOpKind::GeCmp => ast.ge_cmp_with_pos(left.to_viper(ast), right.to_viper(ast), pos.to_viper(ast)),
+                            BinOpKind::LtCmp => ast.lt_cmp_with_pos(left.to_viper(ast), right.to_viper(ast), pos.to_viper(ast)),
+                            BinOpKind::LeCmp => ast.le_cmp_with_pos(left.to_viper(ast), right.to_viper(ast), pos.to_viper(ast)),
+                            BinOpKind::Add => ast.add_with_pos(left.to_viper(ast), right.to_viper(ast), pos.to_viper(ast)),
+                            BinOpKind::Sub => ast.sub_with_pos(left.to_viper(ast), right.to_viper(ast), pos.to_viper(ast)),
+                            BinOpKind::Mul => ast.mul_with_pos(left.to_viper(ast), right.to_viper(ast), pos.to_viper(ast)),
+                            BinOpKind::Div => ast.div_with_pos(left.to_viper(ast), right.to_viper(ast), pos.to_viper(ast)),
+                            _ => unreachable!()
+                        }
+                    }
+                },
+
+                _ =>  match op {
+                    BinOpKind::Mod => ast.module_with_pos(left.to_viper(ast), right.to_viper(ast), pos.to_viper(ast)),
+                    BinOpKind::And => ast.and_with_pos(left.to_viper(ast), right.to_viper(ast), pos.to_viper(ast)),
+                    BinOpKind::Or => ast.or_with_pos(left.to_viper(ast), right.to_viper(ast), pos.to_viper(ast)),
+                    BinOpKind::Implies => ast.implies_with_pos(left.to_viper(ast), right.to_viper(ast), pos.to_viper(ast)),
+                    _ => unreachable!()
                 }
             },
             Expr::ContainerOp(op_kind, box ref left, box ref right, _pos) => {
@@ -510,6 +533,8 @@ impl<'v, 'a, 'b> ToViper<'v, viper::Expr<'v>> for (&'a Const, &'b Position) {
             Const::Bool(false) => ast.false_lit_with_pos(self.1.to_viper(ast)),
             Const::Int(x) => ast.int_lit_with_pos(*x, self.1.to_viper(ast)),
             Const::BigInt(ref x) => ast.int_lit_from_ref_with_pos(x, self.1.to_viper(ast)),
+            Const::Float(FloatConst::FloatConst32(val)) => ast.backend_f32_lit(*val),
+            Const::Float(FloatConst::FloatConst64(val)) => ast.backend_f64_lit(*val),
             Const::FnPtr => ast.null_lit_with_pos(self.1.to_viper(ast)),
         }
     }

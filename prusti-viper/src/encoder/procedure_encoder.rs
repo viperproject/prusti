@@ -18,6 +18,7 @@ use crate::encoder::mir_encoder::PRECONDITION_LABEL;
 use crate::encoder::mir_successor::MirSuccessor;
 use crate::encoder::places::{Local, LocalVariableManager, Place};
 use crate::encoder::Encoder;
+use prusti_common::vir::BinOpKind;
 use prusti_common::{
     config,
     report::log,
@@ -28,7 +29,7 @@ use prusti_common::{
         borrows::Borrow,
         collect_assigned_vars,
         fixes::fix_ghost_vars,
-        CfgBlockIndex, Expr, ExprIterator, Successor, Type,
+        CfgBlockIndex, Expr, ExprIterator, Successor, Type, FloatSize, UnaryOpKind,
     },
 };
 use prusti_interface::{
@@ -67,6 +68,7 @@ use prusti_interface::environment::borrowck::regions::PlaceRegionsError;
 use crate::encoder::errors::EncodingErrorKind;
 use crate::encoder::snapshot;
 use std::convert::TryInto;
+use viper::{BinOpFloat, UnOpFloat};
 
 pub struct ProcedureEncoder<'p, 'v: 'p, 'tcx: 'v> {
     encoder: &'p Encoder<'v, 'tcx>,
@@ -886,6 +888,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 vir::Type::Domain(_) => BuiltinMethodKind::HavocRef,
                 vir::Type::Snapshot(_) => BuiltinMethodKind::HavocRef,
                 vir::Type::Seq(_) => BuiltinMethodKind::HavocRef,
+                vir::Type::Float(FloatSize::F32) => BuiltinMethodKind::HavocF32,
+                vir::Type::Float(FloatSize::F64) => BuiltinMethodKind::HavocF64,
             };
             let stmt = vir::Stmt::MethodCall(
                 self.encoder.encode_builtin_method_use(builtin_method),
@@ -2186,6 +2190,47 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                             );
                         }
 
+                        "core::f32::<impl f32>::is_nan" |
+                        "core::f64::<impl f64>::is_nan" => {
+                            let span = self.mir_encoder.get_span_of_location(location);
+
+                            let label = self.cfg_method.get_fresh_label_name();
+                            stmts.push(vir::Stmt::Label(label.clone()));
+
+                            // Havoc the content of the lhs
+                            let (target_place, pre_stmts) = self.encode_pure_function_call_lhs_place(destination);
+                            stmts.extend(pre_stmts);
+                            stmts.extend(self.encode_havoc(&target_place));
+                            let type_predicate = self
+                                .mir_encoder
+                                .encode_place_predicate_permission(target_place.clone(), vir::PermAmount::Write)
+                                .unwrap();
+
+                            stmts.push(vir::Stmt::Inhale(
+                                type_predicate,
+                            ));
+
+                            // Store a label for permissions got back from the call
+                            self.label_after_location.insert(location, label.clone());
+
+                            let lhs = vir::Expr::field(
+                                target_place.clone(),
+                                vir::Field::new("val_bool", vir::Type::Bool)
+                            );
+
+                            let operand = self.mir_encoder.encode_operand_expr(&args[0]).with_span(span)?;
+                            let expr = Expr::is_nan(operand);
+
+                            stmts.push(vir::Stmt::Assign(lhs, expr, vir::AssignKind::Copy));
+
+                            self.encode_transfer_args_permissions(location, args, &mut stmts, label, false)?;
+                        }
+
+                        "core::f32::<impl f32>::min"  => { self.encode_float_min_max_call(FloatSize::F32, BinOpFloat::Min, args, &mut stmts, destination, location); }
+                        "core::f32::<impl f64>::min"  => { self.encode_float_min_max_call(FloatSize::F64, BinOpFloat::Min, args, &mut stmts, destination, location); }
+                        "core::f32::<impl f32>::max"  => { self.encode_float_min_max_call(FloatSize::F32, BinOpFloat::Max, args, &mut stmts, destination, location); }
+                        "core::f64::<impl f64>::max"  => { self.encode_float_min_max_call(FloatSize::F64, BinOpFloat::Max, args, &mut stmts, destination, location); }
+
                         "std::ops::Fn::call" => {
                             let cl_type: ty::Ty = substs[0].expect_ty();
                             match cl_type.kind() {
@@ -2244,7 +2289,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                                     let arg_expr = self.mir_encoder.encode_operand_expr(operand);
                                     arg_exprs.push(arg_expr);
                                 }
-
                                 stmts.extend(
                                     self.encode_pure_function_call(
                                         location,
@@ -2324,7 +2368,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                     let assert_msg = msg.description().to_string();
                     (assert_msg.clone(), ErrorCtxt::AssertTerminator(assert_msg))
                 };
-
                 stmts.push(vir::Stmt::comment(format!("Rust assertion: {}", assert_msg)));
                 if self.check_panics {
                     stmts.push(vir::Stmt::Assert(
@@ -5645,6 +5688,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             ty::TyKind::Bool
             | ty::TyKind::Int(_)
             | ty::TyKind::Uint(_)
+            | ty::TyKind::Float(_)
             | ty::TyKind::Char => {
                 self.encode_copy_primitive_value(src, dst, self_ty, location)?
             }
@@ -6057,6 +6101,46 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 (res, stmts)
             }
         })
+    }
+
+    fn encode_float_min_max_call(&mut self, float_size:FloatSize, op:BinOpFloat, args: &[mir::Operand<'tcx>],stmts: &mut Vec<vir::Stmt>, destination: &Option<(mir::Place<'tcx>, BasicBlockIndex)>,location: mir::Location) -> () {
+        let span = self.mir_encoder.get_span_of_location(location);
+
+        let label = self.cfg_method.get_fresh_label_name();
+        stmts.push(vir::Stmt::Label(label.clone()));
+
+        // Havoc the content of the lhs
+        let (target_place, pre_stmts) = self.encode_pure_function_call_lhs_place(destination);
+        stmts.extend(pre_stmts);
+        stmts.extend(self.encode_havoc(&target_place));
+
+        let field = match float_size {
+            FloatSize::F32 => vir::Field::new("val_float32", vir::Type::Float(FloatSize::F32)),
+            FloatSize::F64 => vir::Field::new("val_float64", vir::Type::Float(FloatSize::F64))
+        };        
+        let lhs = vir::Expr::field(
+            target_place.clone(),
+            field
+        );
+
+        let acc = Expr::acc_permission(lhs.clone(), vir::PermAmount::Write);
+        stmts.push(vir::Stmt::Inhale(
+            acc
+        ));
+
+        // Store a label for permissions got back from the call
+        self.label_after_location.insert(location, label.clone());
+
+        let arg0 = self.mir_encoder.encode_operand_expr(&args[0]).with_span(span).unwrap();
+        let arg1 = self.mir_encoder.encode_operand_expr(&args[1]).with_span(span).unwrap();        
+        let expr = match op {
+            BinOpFloat::Min => Expr::min(arg0, arg1),
+            BinOpFloat::Max => Expr::max(arg0, arg1),
+            _ => unreachable!()
+        };
+        stmts.push(vir::Stmt::Assign(lhs, expr, vir::AssignKind::Copy));
+
+        self.encode_transfer_args_permissions(location, args, stmts, label, false).unwrap();
     }
 }
 

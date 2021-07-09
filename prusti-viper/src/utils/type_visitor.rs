@@ -7,7 +7,7 @@
 use rustc_hir::Mutability;
 use rustc_middle::ty::{
     AdtDef, FieldDef, ParamTy, ProjectionTy, Region, Slice, Ty, TyCtxt,
-    TypeFlags, TyKind, IntTy, UintTy, VariantDef, subst::SubstsRef, Const
+    TypeFlags, TyKind, IntTy, UintTy, FloatTy, VariantDef, subst::SubstsRef, Const
 };
 use rustc_hir::def_id::DefId;
 use log::trace;
@@ -70,9 +70,11 @@ pub trait TypeVisitor<'tcx>: Sized {
             TyKind::Array(ty, len) => {
                 self.visit_array(ty, len)
             }
+            TyKind::Float(fty) => self.visit_float(fty),
             ref x => {
                 self.visit_unsupported_sty(x)
             }
+
         }
     }
 
@@ -98,6 +100,10 @@ pub trait TypeVisitor<'tcx>: Sized {
     }
 
     fn visit_char(&mut self) -> Result<(), Self::Error> {
+        Ok(())
+    }
+
+    fn visit_float(&mut self, _ty: FloatTy) -> Result<(), Self::Error> {
         Ok(())
     }
 

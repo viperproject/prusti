@@ -5,6 +5,8 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use ::log::{debug, trace};
+use num_traits::Float;
+use prusti_common::vir::FloatSize;
 use rustc_middle::ty;
 use rustc_middle::ty::layout::IntegerExt;
 use rustc_target::abi::Integer;
@@ -232,6 +234,14 @@ impl SnapshotEncoder {
                         expr.clone(),
                         vir::Field::new("val_bool", Type::Bool),
                     ),
+                    ty::TyKind::Float(ty::FloatTy::F32) => Expr::field(
+                        expr.clone(),
+                        vir::Field::new("val_float32", Type::Float(FloatSize::F32)),
+                    ),
+                    ty::TyKind::Float(ty::FloatTy::F64) => Expr::field(
+                        expr.clone(),
+                        vir::Field::new("val_float64", Type::Float(FloatSize::F64)),
+                    ),
                     ty::TyKind::Tuple(substs) if substs.is_empty() => self.snap_unit(),
                     ty::TyKind::Adt(adt_def, _) if adt_def.variants.is_empty() => self.snap_unit(),
                     ty::TyKind::Adt(adt_def, _) if adt_def.variants.len() == 1 && adt_def.variants[rustc_target::abi::VariantIdx::from_u32(0)].fields.is_empty() => self.snap_unit(),
@@ -248,7 +258,8 @@ impl SnapshotEncoder {
             vir::Type::Domain(dom) if dom == UNIT_DOMAIN_NAME => Ok(expr),
             vir::Type::Snapshot(_)
             | vir::Type::Bool // TODO: restrict to snapshot-produced Bools and Ints
-            | vir::Type::Int => Ok(expr),
+            | vir::Type::Int
+            | vir::Type::Float(_) => Ok(expr),
 
             _ => Err(EncodingError::internal(
                 format!("SnapApp applied to expr of invalid type {:?}", expr),
@@ -496,6 +507,8 @@ impl SnapshotEncoder {
             ty::TyKind::Uint(_) => Type::Int,
             ty::TyKind::Char => Type::Int,
             ty::TyKind::Bool => Type::Bool,
+            ty::TyKind::Float(ty::FloatTy::F32) => Type::Float(FloatSize::F32),
+            ty::TyKind::Float(ty::FloatTy::F64) => Type::Float(FloatSize::F64),
             ty::TyKind::Tuple(substs) if substs.is_empty() => self.snap_unit().get_type().clone(),
             ty::TyKind::Adt(adt_def, _) if adt_def.variants.is_empty() => self.snap_unit().get_type().clone(),
             ty::TyKind::Adt(adt_def, _) if adt_def.variants.len() == 1 && adt_def.variants[rustc_target::abi::VariantIdx::from_u32(0)].fields.is_empty() => self.snap_unit().get_type().clone(),
@@ -549,6 +562,8 @@ impl SnapshotEncoder {
             | ty::TyKind::Uint(_)
             | ty::TyKind::Char => Ok(Snapshot::Primitive(Type::Int)),
             ty::TyKind::Bool => Ok(Snapshot::Primitive(Type::Bool)),
+            ty::TyKind::Float(ty::FloatTy::F32) => Ok(Snapshot::Primitive(Type::Float(FloatSize::F32))),
+            ty::TyKind::Float(ty::FloatTy::F64) => Ok(Snapshot::Primitive(Type::Float(FloatSize::F64))),
 
             // handle types with no data
             ty::TyKind::Tuple(substs) if substs.is_empty() => Ok(Snapshot::Unit),
