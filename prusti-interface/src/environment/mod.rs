@@ -29,6 +29,7 @@ mod dump_borrowck_info;
 mod loops;
 mod loops_utils;
 pub mod mir_analyses;
+pub mod mir_storage;
 pub mod mir_utils;
 pub mod place_set;
 pub mod polonius_info;
@@ -228,8 +229,11 @@ impl<'tcx> Environment<'tcx> {
         if let Some(body) = bodies.get(&def_id) {
             body.clone()
         } else {
-            let body_with_facts = rustc_mir::consumers::get_body_with_borrowck_facts(
-                self.tcx, ty::WithOptConstParam::unknown(def_id));
+            // SAFETY: This is safe because we are feeding in the same `tcx`
+            // that was used to store the data.
+            let body_with_facts = unsafe {
+                self::mir_storage::retrieve_mir_body(self.tcx, def_id)
+            };
             let body = body_with_facts.body;
             let facts = BorrowckFacts {
                 input_facts: RefCell::new(Some(body_with_facts.input_facts)),

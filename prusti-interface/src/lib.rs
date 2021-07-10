@@ -8,6 +8,7 @@
 
 #![allow(unused_imports)]
 #![deny(unused_must_use)]
+#![deny(unsafe_op_in_unsafe_fn)]
 
 // #![deny(unused_imports)]
 // #![deny(unused_mut)]
