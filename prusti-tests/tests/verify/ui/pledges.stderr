@@ -1,7 +1,7 @@
 error: [Prusti: verification error] the asserted expression might not hold
-  --> $DIR/pledges.rs:33:5
+  --> $DIR/pledges.rs:34:5
    |
-33 |     assert!(a.f == 6);
+34 |     assert!(a.f == 6);
    |     ^^^^^^^^^^^^^^^^^^
    |
    = note: this error originates in the macro `assert` (in Nightly builds, run with -Z macro-backtrace for more info)

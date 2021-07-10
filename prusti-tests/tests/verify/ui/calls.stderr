@@ -1,25 +1,25 @@
 error: [Prusti: verification error] the asserted expression might not hold
-  --> $DIR/calls.rs:28:5
+  --> $DIR/calls.rs:29:5
    |
-28 |     assert!(z == 5);
+29 |     assert!(z == 5);
    |     ^^^^^^^^^^^^^^^^
    |
    = note: this error originates in the macro `assert` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error: [Prusti: verification error] postcondition might not hold.
-  --> $DIR/calls.rs:35:9
+  --> $DIR/calls.rs:36:9
    |
-35 |         result == 3     // test that we get correct span information
+36 |         result == 3     // test that we get correct span information
    |         ^^^^^^^^^^^
    |
 note: the error originates here
-  --> $DIR/calls.rs:43:1
+  --> $DIR/calls.rs:44:1
    |
-43 | / fn test_max3() -> i32 {
-44 | |     let a = 4;
-45 | |     let b = 3;
-46 | |     max(a, b)
-47 | | }
+44 | / fn test_max3() -> i32 {
+45 | |     let a = 4;
+46 | |     let b = 3;
+47 | |     max(a, b)
+48 | | }
    | |_^
 
 error: aborting due to 2 previous errors

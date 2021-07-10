@@ -1,6 +1,7 @@
 // compile-flags: -Pprint_desugared_specs=true -Pprint_typeckd_specs=true -Pno_verify=true -Phide_uuids=true
 // normalize-stdout-test: "[a-z0-9]{32}" -> "$(NUM_UUID)"
 // normalize-stdout-test: "[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}" -> "$(UUID)"
+// normalize-stdout-test: "/[[a-z0-9]{4}/]::" -> "[$(CRATE_ID)]::"
 
 
 
@@ -117,8 +118,8 @@ fn test4() {
     }
 }
 fn main() { }
-Loop(LoopSpecification { invariant: [Assertion { kind: Expr(Expression { spec_id: SpecificationId($(UUID)), id: ExpressionId(101), expr: DefId(0:13 ~ true[317d]::test3::{closure#0}::{closure#0}) }) }] })
-Loop(LoopSpecification { invariant: [Assertion { kind: Expr(Expression { spec_id: SpecificationId($(UUID)), id: ExpressionId(101), expr: DefId(0:20 ~ true[317d]::test4::{closure#0}::{closure#0}) }) }] })
-Procedure(ProcedureSpecification { pres: [Assertion { kind: Expr(Expression { spec_id: SpecificationId($(UUID)), id: ExpressionId(101), expr: DefId(0:7 ~ true[317d]::prusti_pre_item_test1_$(NUM_UUID)::{closure#0}) }) }], posts: [], pledges: [], predicate_body: None, pure: false, trusted: false })
-Procedure(ProcedureSpecification { pres: [], posts: [Assertion { kind: Expr(Expression { spec_id: SpecificationId($(UUID)), id: ExpressionId(101), expr: DefId(0:10 ~ true[317d]::prusti_post_item_test2_$(NUM_UUID)::{closure#0}) }) }], pledges: [], predicate_body: None, pure: false, trusted: false })
-Procedure(ProcedureSpecification { pres: [Assertion { kind: Expr(Expression { spec_id: SpecificationId($(UUID)), id: ExpressionId(101), expr: DefId(0:15 ~ true[317d]::prusti_pre_item_test4_$(NUM_UUID)::{closure#0}) }) }], posts: [Assertion { kind: Expr(Expression { spec_id: SpecificationId($(UUID)), id: ExpressionId(101), expr: DefId(0:17 ~ true[317d]::prusti_post_item_test4_$(NUM_UUID)::{closure#0}) }) }], pledges: [], predicate_body: None, pure: false, trusted: false })
+Loop(LoopSpecification { invariant: [Assertion { kind: Expr(Expression { spec_id: SpecificationId($(UUID)), id: ExpressionId(101), expr: DefId(0:13 ~ true[$(CRATE_ID)]::test3::{closure#0}::{closure#0}) }) }] })
+Loop(LoopSpecification { invariant: [Assertion { kind: Expr(Expression { spec_id: SpecificationId($(UUID)), id: ExpressionId(101), expr: DefId(0:20 ~ true[$(CRATE_ID)]::test4::{closure#0}::{closure#0}) }) }] })
+Procedure(ProcedureSpecification { pres: [Assertion { kind: Expr(Expression { spec_id: SpecificationId($(UUID)), id: ExpressionId(101), expr: DefId(0:7 ~ true[$(CRATE_ID)]::prusti_pre_item_test1_$(NUM_UUID)::{closure#0}) }) }], posts: [], pledges: [], predicate_body: None, pure: false, trusted: false })
+Procedure(ProcedureSpecification { pres: [], posts: [Assertion { kind: Expr(Expression { spec_id: SpecificationId($(UUID)), id: ExpressionId(101), expr: DefId(0:10 ~ true[$(CRATE_ID)]::prusti_post_item_test2_$(NUM_UUID)::{closure#0}) }) }], pledges: [], predicate_body: None, pure: false, trusted: false })
+Procedure(ProcedureSpecification { pres: [Assertion { kind: Expr(Expression { spec_id: SpecificationId($(UUID)), id: ExpressionId(101), expr: DefId(0:15 ~ true[$(CRATE_ID)]::prusti_pre_item_test4_$(NUM_UUID)::{closure#0}) }) }], posts: [Assertion { kind: Expr(Expression { spec_id: SpecificationId($(UUID)), id: ExpressionId(101), expr: DefId(0:17 ~ true[$(CRATE_ID)]::prusti_post_item_test4_$(NUM_UUID)::{closure#0}) }) }], pledges: [], predicate_body: None, pure: false, trusted: false })

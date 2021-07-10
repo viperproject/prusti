@@ -1,6 +1,7 @@
 // compile-flags: -Pprint_desugared_specs=true -Pprint_typeckd_specs=true -Pno_verify=true -Phide_uuids=true
 // normalize-stdout-test: "[a-z0-9]{32}" -> "$(NUM_UUID)"
 // normalize-stdout-test: "[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}" -> "$(UUID)"
+// normalize-stdout-test: "/[[a-z0-9]{4}/]::" -> "[$(CRATE_ID)]::"
 
 
 
@@ -107,6 +108,6 @@ fn forall_implication() -> bool {
                                                                  }))
 }
 fn main() { }
-Procedure(ProcedureSpecification { pres: [Assertion { kind: Expr(Expression { spec_id: SpecificationId($(UUID)), id: ExpressionId(101), expr: DefId(0:10 ~ predicates[317d]::prusti_pre_item_use_pred_$(NUM_UUID)::{closure#0}) }) }], posts: [], pledges: [], predicate_body: None, pure: false, trusted: false })
-Procedure(ProcedureSpecification { pres: [], posts: [], pledges: [], predicate_body: Some(Assertion { kind: ForAll(ForAllVars { spec_id: SpecificationId($(UUID)), id: ExpressionId(101), vars: [(_2, bool)] }, TriggerSet([]), Assertion { kind: Expr(Expression { spec_id: SpecificationId($(UUID)), id: ExpressionId(102), expr: DefId(0:7 ~ predicates[317d]::prusti_pred_item_pred_$(NUM_UUID)::{closure#0}::{closure#0}) }) }) }), pure: true, trusted: true })
-Procedure(ProcedureSpecification { pres: [], posts: [], pledges: [], predicate_body: Some(Assertion { kind: ForAll(ForAllVars { spec_id: SpecificationId($(UUID)), id: ExpressionId(101), vars: [(_2, usize)] }, TriggerSet([]), Assertion { kind: Implies(Assertion { kind: Expr(Expression { spec_id: SpecificationId($(UUID)), id: ExpressionId(102), expr: DefId(0:14 ~ predicates[317d]::prusti_pred_item_forall_implication_$(NUM_UUID)::{closure#0}::{closure#0}) }) }, Assertion { kind: Expr(Expression { spec_id: SpecificationId($(UUID)), id: ExpressionId(103), expr: DefId(0:15 ~ predicates[317d]::prusti_pred_item_forall_implication_$(NUM_UUID)::{closure#0}::{closure#1}) }) }) }) }), pure: true, trusted: true })
+Procedure(ProcedureSpecification { pres: [Assertion { kind: Expr(Expression { spec_id: SpecificationId($(UUID)), id: ExpressionId(101), expr: DefId(0:10 ~ predicates[$(CRATE_ID)]::prusti_pre_item_use_pred_$(NUM_UUID)::{closure#0}) }) }], posts: [], pledges: [], predicate_body: None, pure: false, trusted: false })
+Procedure(ProcedureSpecification { pres: [], posts: [], pledges: [], predicate_body: Some(Assertion { kind: ForAll(ForAllVars { spec_id: SpecificationId($(UUID)), id: ExpressionId(101), vars: [(_2, bool)] }, TriggerSet([]), Assertion { kind: Expr(Expression { spec_id: SpecificationId($(UUID)), id: ExpressionId(102), expr: DefId(0:7 ~ predicates[$(CRATE_ID)]::prusti_pred_item_pred_$(NUM_UUID)::{closure#0}::{closure#0}) }) }) }), pure: true, trusted: true })
+Procedure(ProcedureSpecification { pres: [], posts: [], pledges: [], predicate_body: Some(Assertion { kind: ForAll(ForAllVars { spec_id: SpecificationId($(UUID)), id: ExpressionId(101), vars: [(_2, usize)] }, TriggerSet([]), Assertion { kind: Implies(Assertion { kind: Expr(Expression { spec_id: SpecificationId($(UUID)), id: ExpressionId(102), expr: DefId(0:14 ~ predicates[$(CRATE_ID)]::prusti_pred_item_forall_implication_$(NUM_UUID)::{closure#0}::{closure#0}) }) }, Assertion { kind: Expr(Expression { spec_id: SpecificationId($(UUID)), id: ExpressionId(103), expr: DefId(0:15 ~ predicates[$(CRATE_ID)]::prusti_pred_item_forall_implication_$(NUM_UUID)::{closure#0}::{closure#1}) }) }) }) }), pure: true, trusted: true })

@@ -12,11 +12,15 @@ use rustc_middle::mir;
 use rustc_hir::hir_id::HirId;
 use rustc_hir::def_id::{DefId, LocalDefId};
 use rustc_middle::ty::{self, TyCtxt, ParamEnv, WithOptConstParam};
+use rustc_trait_selection::infer::{TyCtxtInferExt, InferCtxtExt};
 use std::path::PathBuf;
 use std::cell::Ref;
 use rustc_span::{Span, MultiSpan, symbol::Symbol};
 use std::collections::HashSet;
 use log::debug;
+use std::rc::Rc;
+use std::collections::HashMap;
+use std::cell::RefCell;
 
 pub mod borrowck;
 mod collect_prusti_spec_visitor;
@@ -25,6 +29,7 @@ mod dump_borrowck_info;
 mod loops;
 mod loops_utils;
 pub mod mir_analyses;
+pub mod mir_storage;
 pub mod mir_utils;
 pub mod place_set;
 pub mod polonius_info;
@@ -36,6 +41,7 @@ use rustc_hir::intravisit::Visitor;
 pub use self::loops::{PlaceAccess, PlaceAccessKind, ProcedureLoops};
 pub use self::loops_utils::*;
 pub use self::procedure::{BasicBlockIndex, Procedure};
+use self::borrowck::facts::BorrowckFacts;
 // use config;
 use crate::data::ProcedureDefId;
 // use syntax::codemap::CodeMap;
@@ -46,13 +52,21 @@ use rustc_span::source_map::SourceMap;
 /// Facade to the Rust compiler.
 // #[derive(Copy, Clone)]
 pub struct Environment<'tcx> {
+    /// Cached MIR bodies.
+    bodies: RefCell<HashMap<LocalDefId, Rc<mir::Body<'tcx>>>>,
+    /// Cached borrowck information.
+    borrowck_facts: RefCell<HashMap<LocalDefId, Rc<BorrowckFacts>>>,
     tcx: TyCtxt<'tcx>,
 }
 
 impl<'tcx> Environment<'tcx> {
     /// Builds an environment given a compiler state.
     pub fn new(tcx: TyCtxt<'tcx>) -> Self {
-        Environment { tcx }
+        Environment {
+            tcx,
+            bodies: RefCell::new(HashMap::new()),
+            borrowck_facts: RefCell::new(HashMap::new()),
+        }
     }
 
     /// Returns the path of the source that is being compiled
@@ -205,15 +219,41 @@ impl<'tcx> Environment<'tcx> {
     }
 
     /// Get a Procedure.
-    pub fn get_procedure<'a>(&'a self, proc_def_id: ProcedureDefId) -> Procedure<'a, 'tcx> {
-        Procedure::new(self.tcx(), proc_def_id)
+    pub fn get_procedure(&self, proc_def_id: ProcedureDefId) -> Procedure<'tcx> {
+        Procedure::new(self, proc_def_id)
     }
 
     /// Get the MIR body of a local procedure.
-    pub fn local_mir<'a>(&self, def_id: LocalDefId) -> Ref<'a, mir::Body<'tcx>> {
-        self.tcx().mir_promoted(
-            ty::WithOptConstParam::unknown(def_id)
-        ).0.borrow()
+    pub fn local_mir(&self, def_id: LocalDefId) -> Rc<mir::Body<'tcx>> {
+        let mut bodies = self.bodies.borrow_mut();
+        if let Some(body) = bodies.get(&def_id) {
+            body.clone()
+        } else {
+            // SAFETY: This is safe because we are feeding in the same `tcx`
+            // that was used to store the data.
+            let body_with_facts = unsafe {
+                self::mir_storage::retrieve_mir_body(self.tcx, def_id)
+            };
+            let body = body_with_facts.body;
+            let facts = BorrowckFacts {
+                input_facts: RefCell::new(Some(body_with_facts.input_facts)),
+                output_facts: body_with_facts.output_facts,
+                location_table: RefCell::new(Some(body_with_facts.location_table)),
+            };
+
+            let mut borrowck_facts = self.borrowck_facts.borrow_mut();
+            borrowck_facts.insert(def_id, Rc::new(facts));
+
+            bodies.entry(def_id).or_insert_with(|| {
+                Rc::new(body)
+            }).clone()
+        }
+    }
+
+    /// Get Polonius facts of a local procedure.
+    pub fn local_mir_borrowck_facts(&self, def_id: LocalDefId) -> Rc<BorrowckFacts> {
+        let borrowck_facts = self.borrowck_facts.borrow();
+        borrowck_facts.get(&def_id).unwrap().clone()
     }
 
     /// Get the MIR body of an external procedure.
@@ -273,12 +313,11 @@ impl<'tcx> Environment<'tcx> {
             | ty::TyKind::Opaque(_, subst)
             | ty::TyKind::Generator(_, subst, _)
             | ty::TyKind::Tuple(subst) => {
-                self.tcx.type_implements_trait((
-                    trait_def_id,
-                    ty,
-                    subst,
-                    ParamEnv::empty()
-                ))
+                self.tcx.infer_ctxt().enter(|infcx|
+                    infcx
+                        .type_implements_trait(trait_def_id, ty, subst, ParamEnv::empty())
+                        .must_apply_considering_regions()
+                )
             }
             ty::TyKind::Bool => {
                 self.primitive_type_implements_trait(
@@ -354,13 +393,10 @@ impl<'tcx> Environment<'tcx> {
         trait_def_id: DefId
     ) -> bool {
         assert!(impl_def.is_some());
-        self.tcx.type_implements_trait(
-            (
-                trait_def_id,
-                ty,
-                ty::List::empty(),
-                ParamEnv::empty()
-            )
+        self.tcx.infer_ctxt().enter(|infcx|
+            infcx
+                .type_implements_trait(trait_def_id, ty, ty::List::empty(), ParamEnv::empty())
+                .must_apply_considering_regions()
         )
     }
 }

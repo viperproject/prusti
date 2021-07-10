@@ -1766,17 +1766,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3831453b3449ceb48b6d9c7ad7c96d5ea673e9b470a1dc578c2ce6521230884c"
 
 [[package]]
-name = "polonius-engine"
-version = "0.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ef2558a4b464e185b36ee08a2937ebb62ea5464c38856cfb1465c97cb38db52d"
-dependencies = [
- "datafrog",
- "log 0.4.14",
- "rustc-hash",
-]
-
-[[package]]
 name = "ppv-lite86"
 version = "0.2.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1869,7 +1858,6 @@ dependencies = [
  "datafrog",
  "lazy_static",
  "log 0.4.14",
- "polonius-engine",
  "prusti-common",
  "prusti-specs",
  "regex",

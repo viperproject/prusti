@@ -8,6 +8,7 @@
 
 #![allow(unused_imports)]
 #![deny(unused_must_use)]
+#![deny(unsafe_op_in_unsafe_fn)]
 
 // #![deny(unused_imports)]
 // #![deny(unused_mut)]
@@ -35,14 +36,15 @@ extern crate rustc_attr;
 // #[macro_use]
 // extern crate log;
 // extern crate polonius;
-// extern crate polonius_engine;
+extern crate polonius_engine;
 // extern crate regex;
 // extern crate rustc;
 extern crate rustc_data_structures;
 extern crate rustc_index;
+extern crate rustc_trait_selection;
 // extern crate rustc_driver;
 // extern crate rustc_hash;
-// extern crate rustc_mir;
+extern crate rustc_mir;
 // extern crate rustc_target;
 // #[macro_use]
 // extern crate serde;

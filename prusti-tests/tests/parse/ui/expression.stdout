@@ -1,6 +1,7 @@
 // compile-flags: -Pprint_desugared_specs=true -Pprint_typeckd_specs=true -Pno_verify=true -Phide_uuids=true
 // normalize-stdout-test: "[a-z0-9]{32}" -> "$(NUM_UUID)"
 // normalize-stdout-test: "[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}" -> "$(UUID)"
+// normalize-stdout-test: "/[[a-z0-9]{4}/]::" -> "[$(CRATE_ID)]::"
 
 
 
@@ -43,5 +44,5 @@ fn prusti_post_item_test2_$(NUM_UUID)(result: ()) {
 #[prusti::post_spec_id_ref = "$(NUM_UUID)"]
 fn test2() { }
 fn main() { }
-Procedure(ProcedureSpecification { pres: [], posts: [Assertion { kind: Expr(Expression { spec_id: SpecificationId($(UUID)), id: ExpressionId(101), expr: DefId(0:10 ~ expression[317d]::prusti_post_item_test2_$(NUM_UUID)::{closure#0}) }) }], pledges: [], predicate_body: None, pure: false, trusted: false })
-Procedure(ProcedureSpecification { pres: [Assertion { kind: And([Assertion { kind: Expr(Expression { spec_id: SpecificationId($(UUID)), id: ExpressionId(101), expr: DefId(0:6 ~ expression[317d]::prusti_pre_item_test1_$(NUM_UUID)::{closure#0}) }) }, Assertion { kind: Expr(Expression { spec_id: SpecificationId($(UUID)), id: ExpressionId(102), expr: DefId(0:7 ~ expression[317d]::prusti_pre_item_test1_$(NUM_UUID)::{closure#1}) }) }]) }], posts: [], pledges: [], predicate_body: None, pure: false, trusted: false })
+Procedure(ProcedureSpecification { pres: [], posts: [Assertion { kind: Expr(Expression { spec_id: SpecificationId($(UUID)), id: ExpressionId(101), expr: DefId(0:10 ~ expression[$(CRATE_ID)]::prusti_post_item_test2_$(NUM_UUID)::{closure#0}) }) }], pledges: [], predicate_body: None, pure: false, trusted: false })
+Procedure(ProcedureSpecification { pres: [Assertion { kind: And([Assertion { kind: Expr(Expression { spec_id: SpecificationId($(UUID)), id: ExpressionId(101), expr: DefId(0:6 ~ expression[$(CRATE_ID)]::prusti_pre_item_test1_$(NUM_UUID)::{closure#0}) }) }, Assertion { kind: Expr(Expression { spec_id: SpecificationId($(UUID)), id: ExpressionId(102), expr: DefId(0:7 ~ expression[$(CRATE_ID)]::prusti_pre_item_test1_$(NUM_UUID)::{closure#1}) }) }]) }], posts: [], pledges: [], predicate_body: None, pure: false, trusted: false })

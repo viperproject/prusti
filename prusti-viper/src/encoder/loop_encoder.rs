@@ -18,14 +18,14 @@ pub enum LoopEncoderError {
 }
 
 pub struct LoopEncoder<'p, 'tcx: 'p> {
-    procedure: &'p Procedure<'p, 'tcx>,
+    procedure: &'p Procedure<'tcx>,
     tcx: ty::TyCtxt<'tcx>,
     initialization: DefinitelyInitializedAnalysisResult<'tcx>,
 }
 
 impl<'p, 'tcx: 'p> LoopEncoder<'p, 'tcx> {
     pub fn new(
-        procedure: &'p Procedure<'p, 'tcx>,
+        procedure: &'p Procedure<'tcx>,
         tcx: ty::TyCtxt<'tcx>,
     ) -> Self {
         LoopEncoder {

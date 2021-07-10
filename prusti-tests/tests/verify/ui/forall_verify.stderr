@@ -1,13 +1,13 @@
 error: [Prusti: verification error] postcondition might not hold.
-  --> $DIR/forall_verify.rs:16:27
+  --> $DIR/forall_verify.rs:17:27
    |
-16 | #[ensures(forall(|x: i32| identity(x) == x + 1))]
+17 | #[ensures(forall(|x: i32| identity(x) == x + 1))]
    |                           ^^^^^^^^^^^^^^^^^^^^
    |
 note: the error originates here
-  --> $DIR/forall_verify.rs:17:1
+  --> $DIR/forall_verify.rs:18:1
    |
-17 | fn test3() {}
+18 | fn test3() {}
    | ^^^^^^^^^^^^^
 
 error: aborting due to previous error

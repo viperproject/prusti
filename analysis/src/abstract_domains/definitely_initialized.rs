@@ -40,24 +40,27 @@ impl<'a, 'tcx: 'a> fmt::Debug for DefinitelyInitializedState<'a, 'tcx> {
 
 impl<'a, 'tcx: 'a> PartialEq for DefinitelyInitializedState<'a, 'tcx> {
     fn eq(&self, other: &Self) -> bool {
-        debug_assert_eq!(
-            {
-                let mut stable_hasher = StableHasher::new();
-                self.mir.hash_stable(
-                    &mut self.tcx.get_stable_hashing_context(),
-                    &mut stable_hasher,
-                );
-                stable_hasher.finish::<Fingerprint>()
-            },
-            {
-                let mut stable_hasher = StableHasher::new();
-                other.mir.hash_stable(
-                    &mut other.tcx.get_stable_hashing_context(),
-                    &mut stable_hasher,
-                );
-                stable_hasher.finish::<Fingerprint>()
-            },
-        );
+        // TODO: This assert is commented out because the stable hasher crashes
+        // on MIR that has region ids.
+        //
+        // debug_assert_eq!(
+        //     {
+        //         let mut stable_hasher = StableHasher::new();
+        //         self.mir.hash_stable(
+        //             &mut self.tcx.get_stable_hashing_context(),
+        //             &mut stable_hasher,
+        //         );
+        //         stable_hasher.finish::<Fingerprint>()
+        //     },
+        //     {
+        //         let mut stable_hasher = StableHasher::new();
+        //         other.mir.hash_stable(
+        //             &mut other.tcx.get_stable_hashing_context(),
+        //             &mut stable_hasher,
+        //         );
+        //         stable_hasher.finish::<Fingerprint>()
+        //     },
+        // );
         self.def_init_places == other.def_init_places
     }
 }
