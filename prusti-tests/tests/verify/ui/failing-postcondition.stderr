@@ -10,11 +10,11 @@ note: the error originates here
 9 | fn client(a: u32) {}
   | ^^^^^^^^^^^^^^^^^^^^
 
-error: [Prusti: verification error] postcondition of pure function definition might not hold
-  --> $DIR/failing-postcondition.rs:13:1
+error: [Prusti: verification error] postcondition might not hold.
+  --> $DIR/failing-postcondition.rs:12:11
    |
-13 | fn test1() -> bool { false }
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+12 | #[ensures(result)]
+   |           ^^^^^^
    |
 note: the error originates here
   --> $DIR/failing-postcondition.rs:13:1
@@ -22,17 +22,17 @@ note: the error originates here
 13 | fn test1() -> bool { false }
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: [Prusti: verification error] postcondition of pure function definition might not hold
+error: [Prusti: verification error] postcondition might not hold.
   --> $DIR/failing-postcondition.rs:16:11
    |
 16 | #[ensures(x)]
    |           ^
    |
 note: the error originates here
-  --> $DIR/failing-postcondition.rs:16:11
+  --> $DIR/failing-postcondition.rs:17:1
    |
-16 | #[ensures(x)]
-   |           ^
+17 | fn test2(x: bool) -> bool { x }
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: aborting due to 3 previous errors
 

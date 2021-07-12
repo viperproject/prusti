@@ -714,13 +714,10 @@ impl<'v, 'tcx> Encoder<'v, 'tcx> {
             .patch_snapshots_expr(self, expr)
     }
 
+    /// This encodes the Rust function as a Viper method for verification. It
+    /// does this also for pure functions.
     pub fn encode_procedure(&self, def_id: ProcedureDefId) -> SpannedEncodingResult<()> {
         debug!("encode_procedure({:?})", def_id);
-        assert!(
-            !self.is_pure(def_id),
-            "procedure is marked as pure: {:?}",
-            def_id
-        );
         assert!(
             !self.is_trusted(def_id),
             "procedure is marked as trusted: {:?}",
@@ -1280,27 +1277,19 @@ impl<'v, 'tcx> Encoder<'v, 'tcx> {
                 "Encoding: {} from {:?} ({})",
                 proc_name, proc_span, proc_def_path
             );
-            let is_pure_function = self.is_pure(proc_def_id);
-            if is_pure_function {
-                if let Err(error) = self.encode_pure_function_def(proc_def_id, substs) {
-                    self.register_encoding_error(error);
-                    debug!("Error encoding pure function: {:?}", proc_def_id);
-                }
+            assert!(substs.is_empty());
+            if self.is_trusted(proc_def_id) {
+                debug!(
+                    "Trusted procedure will not be encoded or verified: {:?}",
+                    proc_def_id
+                );
             } else {
-                assert!(substs.is_empty());
-                if self.is_trusted(proc_def_id) {
-                    debug!(
-                        "Trusted procedure will not be encoded or verified: {:?}",
-                        proc_def_id
-                    );
+                if let Err(error) = self.encode_procedure(proc_def_id) {
+                    self.register_encoding_error(error);
+                    debug!("Error encoding function: {:?}", proc_def_id);
                 } else {
-                    if let Err(error) = self.encode_procedure(proc_def_id) {
-                        self.register_encoding_error(error);
-                        debug!("Error encoding function: {:?}", proc_def_id);
-                    } else {
-                        let program = self.finalize_viper_program(proc_name);
-                        self.programs.push(program);
-                    }
+                    let program = self.finalize_viper_program(proc_name);
+                    self.programs.push(program);
                 }
             }
 
