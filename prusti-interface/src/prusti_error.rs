@@ -18,13 +18,25 @@ use ::log::warn;
 ///
 /// A `PrustiError` can be displayed as a *warning* to the user. (We should rename `PrustiError`,
 /// `SpannedEncodingError` and similar types to something less confusing.)
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PrustiError {
     is_error: bool,
     message: String,
     span: MultiSpan,
     help: Option<String>,
     note: Option<(String, MultiSpan)>,
+}
+
+impl PartialOrd for PrustiError {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.span.primary_span().partial_cmp(&other.span.primary_span())
+    }
+}
+
+impl Ord for PrustiError {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.partial_cmp(other).unwrap()
+    }
 }
 
 impl PrustiError {

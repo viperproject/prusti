@@ -317,9 +317,12 @@ impl<'v, 'tcx> Verifier<'v, 'tcx> {
         }
 
         let error_manager = self.encoder.error_manager();
-        for verification_error in verification_errors {
+        let mut prusti_errors: Vec<_> = verification_errors.iter().map(|verification_error| {
             debug!("Verification error: {:?}", verification_error);
-            let prusti_error = error_manager.translate_verification_error(&verification_error);
+            error_manager.translate_verification_error(verification_error)
+        }).collect();
+        prusti_errors.sort();
+        for prusti_error in prusti_errors {
             debug!("Prusti error: {:?}", prusti_error);
             prusti_error.emit(self.env);
             result = VerificationResult::Failure;
