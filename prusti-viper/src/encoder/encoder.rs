@@ -71,6 +71,18 @@ impl<'a, 'tcx> Drop for CleanupTyMapStack<'a, 'tcx> {
     }
 }
 
+#[must_use]
+pub struct RestoreTyMapStack<'a, 'tcx> {
+    stack: Vec<HashMap<ty::Ty<'tcx>, ty::Ty<'tcx>>>,
+    tymap_stack: &'a std::cell::RefCell<Vec<HashMap<ty::Ty<'tcx>, ty::Ty<'tcx>>>>,
+}
+
+impl<'a, 'tcx> Drop for RestoreTyMapStack<'a, 'tcx> {
+    fn drop(&mut self) {
+        std::mem::swap(&mut *self.tymap_stack.borrow_mut(), &mut self.stack);
+    }
+}
+
 pub struct Encoder<'v, 'tcx: 'v> {
     env: &'v Environment<'tcx>,
     def_spec: &'v typed::DefSpecificationMap<'tcx>,
@@ -170,6 +182,14 @@ impl<'v, 'tcx> Encoder<'v, 'tcx> {
             array_types_encoder: RefCell::new(ArrayTypesEncoder::new()),
             encoding_errors_counter: RefCell::new(0),
             name_interner: RefCell::new(NameInterner::new()),
+        }
+    }
+
+    pub fn save_tymap<'a>(&'a self) -> RestoreTyMapStack<'a, 'tcx> {
+        let stack = std::mem::replace(&mut *self.typaram_repl.borrow_mut(), Vec::new());
+        RestoreTyMapStack {
+            tymap_stack: &self.typaram_repl,
+            stack
         }
     }
 
@@ -1135,12 +1155,13 @@ impl<'v, 'tcx> Encoder<'v, 'tcx> {
         );
 
         // FIXME: this is a hack to support generics. See issue #187.
-        let old_typaram_repl = std::mem::replace(&mut *self.typaram_repl.borrow_mut(), Vec::new());
+        let _old_typaram_repl = self.save_tymap();
         assert!(self.typaram_repl.borrow().is_empty());
         let mut tymap = HashMap::new();
         for (typ, subst) in substs {
             tymap.insert(typ, subst);
         }
+
         let _cleanup_token = self.push_temp_tymap(tymap);
 
         // FIXME: Using substitutions as a key is most likely wrong.
@@ -1183,8 +1204,6 @@ impl<'v, 'tcx> Encoder<'v, 'tcx> {
             self.failed_pure_functions.borrow_mut().remove(&key);
             self.pure_functions.borrow_mut().insert(key, function);
         }
-
-        *self.typaram_repl.borrow_mut() = old_typaram_repl;
 
         trace!("[exit] encode_pure_function_def({:?})", proc_def_id);
         Ok(())
