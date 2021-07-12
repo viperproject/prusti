@@ -32,11 +32,11 @@ use std::{
 };
 pub use verifier_runner::*;
 use verifier_thread::*;
-use viper::VerificationResult;
+use viper::ProgramVerificationResult;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct VerifierPanicked;
-pub type RemoteVerificationResult = Result<VerificationResult, VerifierPanicked>;
+pub type RemoteVerificationResult = Result<ProgramVerificationResult, VerifierPanicked>;
 
 pub struct PrustiServer {
     verifier_builder: Arc<VerifierBuilder>,
@@ -76,7 +76,7 @@ impl PrustiServer {
         });
 
         match thread
-            .verify(request.program, request.program_name.clone())
+            .verify(request.programs, request.program_name.clone())
             .wait()
         {
             Ok(result) => {

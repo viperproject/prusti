@@ -242,12 +242,14 @@ impl<'v, 'tcx> Verifier<'v, 'tcx> {
         self.encoder.process_encoding_queue();
 
         let encoding_errors_count = self.encoder.count_encoding_errors();
-        let mut program = self.encoder.get_viper_program();
+        let mut programs = self.encoder.get_viper_programs();
 
         if config::simplify_encoding() {
             stopwatch.start_next("optimizing Viper program");
             let source_file_name = self.encoder.env().source_file_name();
-            program = program.optimized(&source_file_name);
+            programs = programs.into_iter().map(
+                |program| program.optimized(&source_file_name)
+            ).collect();
         }
 
         stopwatch.start_next("verifying Viper program");
@@ -258,7 +260,7 @@ impl<'v, 'tcx> Verifier<'v, 'tcx> {
             .to_str()
             .unwrap()
             .to_owned();
-        let verification_result: viper::VerificationResult = if let Some(server_address) =
+        let verification_result: viper::ProgramVerificationResult = if let Some(server_address) =
             config::server_address()
         {
             let server_address = if server_address == "MOCK" {
@@ -275,7 +277,7 @@ impl<'v, 'tcx> Verifier<'v, 'tcx> {
             });
 
             let request = VerificationRequest {
-                program,
+                programs,
                 program_name,
                 backend_config: Default::default(),
             };
@@ -285,45 +287,44 @@ impl<'v, 'tcx> Verifier<'v, 'tcx> {
             let verifier_builder = VerifierBuilder::new();
             stopwatch.start_next("running verifier");
             VerifierRunner::with_default_configured_runner(&verifier_builder, |runner| {
-                runner.verify(program, program_name.as_str())
+                runner.verify(programs, program_name.as_str())
             })
         };
 
         stopwatch.finish();
 
-        let verification_errors = match verification_result {
-            viper::VerificationResult::Success() => vec![],
-            viper::VerificationResult::Failure(errors) => errors,
-            viper::VerificationResult::ConsistencyErrors(errors) => {
-                debug_assert!(!errors.is_empty());
-                errors.iter().for_each(|e| {
-                    PrustiError::internal(
-                        format!("consistency error: {}", e), DUMMY_SP.into()
-                    ).emit(self.env)
-                });
-                return VerificationResult::Failure;
-            }
-            viper::VerificationResult::JavaException(exception) => {
-                error!("Java exception: {}", exception.get_stack_trace());
-                PrustiError::internal(
-                    format!("{}", exception), DUMMY_SP.into()
-                ).emit(self.env);
-                return VerificationResult::Failure;
-            }
-        };
+        let viper::ProgramVerificationResult {
+            verification_errors,
+            consistency_errors,
+            java_exceptions
+        } = verification_result;
 
-        if encoding_errors_count == 0 && verification_errors.is_empty() {
-            VerificationResult::Success
-        } else {
-            let error_manager = self.encoder.error_manager();
+        let mut result = VerificationResult::Success;
 
-            for verification_error in verification_errors {
-                debug!("Verification error: {:?}", verification_error);
-                let prusti_error = error_manager.translate_verification_error(&verification_error);
-                debug!("Prusti error: {:?}", prusti_error);
-                prusti_error.emit(self.env);
-            }
-            VerificationResult::Failure
+        for viper::ConsistencyError { method, error} in consistency_errors {
+            PrustiError::internal(
+                format!("consistency error in {}: {}", method, error), DUMMY_SP.into()
+            ).emit(self.env);
+            result = VerificationResult::Failure;
         }
+
+        for viper::JavaExceptionWithOrigin { method, exception } in java_exceptions {
+            error!("Java exception: {}", exception.get_stack_trace());
+            PrustiError::internal(
+                format!("in {}: {}", method, exception), DUMMY_SP.into()
+            ).emit(self.env);
+            result = VerificationResult::Failure;
+        }
+
+        let error_manager = self.encoder.error_manager();
+        for verification_error in verification_errors {
+            debug!("Verification error: {:?}", verification_error);
+            let prusti_error = error_manager.translate_verification_error(&verification_error);
+            debug!("Prusti error: {:?}", prusti_error);
+            prusti_error.emit(self.env);
+            result = VerificationResult::Failure;
+        }
+
+        result
     }
 }

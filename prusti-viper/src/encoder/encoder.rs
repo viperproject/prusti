@@ -82,6 +82,7 @@ pub struct Encoder<'v, 'tcx: 'v> {
     builtin_methods: RefCell<HashMap<BuiltinMethodKind, vir::BodylessMethod>>,
     builtin_functions: RefCell<HashMap<BuiltinFunctionKind, vir::Function>>,
     procedures: RefCell<HashMap<ProcedureDefId, vir::CfgMethod>>,
+    programs: Vec<vir::Program>,
     pure_function_bodies: RefCell<HashMap<(ProcedureDefId, String), vir::Expr>>,
     pure_functions: RefCell<HashMap<(ProcedureDefId, String), vir::Function>>,
     failed_pure_functions: RefCell<HashSet<(ProcedureDefId, String)>>,
@@ -144,6 +145,7 @@ impl<'v, 'tcx> Encoder<'v, 'tcx> {
             procedure_contracts: RefCell::new(HashMap::new()),
             builtin_methods: RefCell::new(HashMap::new()),
             builtin_functions: RefCell::new(HashMap::new()),
+            programs: Vec::new(),
             procedures: RefCell::new(HashMap::new()),
             pure_function_bodies: RefCell::new(HashMap::new()),
             pure_functions: RefCell::new(HashMap::new()),
@@ -229,8 +231,9 @@ impl<'v, 'tcx> Encoder<'v, 'tcx> {
         self.error_manager.borrow_mut()
     }
 
-    pub fn get_viper_program(&self) -> vir::Program {
+    pub fn finalize_viper_program(&self, name: String) -> vir::Program {
         vir::Program {
+            name,
             domains: self.get_used_viper_domains(),
             fields: self.get_used_viper_fields(),
             builtin_methods: self.get_used_builtin_methods(),
@@ -238,6 +241,10 @@ impl<'v, 'tcx> Encoder<'v, 'tcx> {
             functions: self.get_used_viper_functions(),
             viper_predicates: self.get_used_viper_predicates(),
         }
+    }
+
+    pub fn get_viper_programs(&mut self) -> Vec<vir::Program> {
+        std::mem::replace(&mut self.programs, Vec::new())
     }
 
     pub(in crate::encoder) fn register_encoding_error(&self, encoding_error: SpannedEncodingError) {
@@ -330,7 +337,7 @@ impl<'v, 'tcx> Encoder<'v, 'tcx> {
     }
 
     fn get_used_viper_methods(&self) -> Vec<vir::CfgMethod> {
-        self.procedures.borrow().values().cloned().collect()
+        self.procedures.borrow_mut().drain().map(|(_, value)| value).collect()
     }
 
     pub fn get_single_closure_instantiation(
@@ -1291,6 +1298,9 @@ impl<'v, 'tcx> Encoder<'v, 'tcx> {
                     if let Err(error) = self.encode_procedure(proc_def_id) {
                         self.register_encoding_error(error);
                         debug!("Error encoding function: {:?}", proc_def_id);
+                    } else {
+                        let program = self.finalize_viper_program(proc_name);
+                        self.programs.push(program);
                     }
                 }
             }
