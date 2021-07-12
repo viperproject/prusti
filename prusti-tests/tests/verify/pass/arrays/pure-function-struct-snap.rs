@@ -1,3 +1,5 @@
+// ignore-test: foo is not supported as impure method
+
 use prusti_contracts::*;
 
 struct Foo {
