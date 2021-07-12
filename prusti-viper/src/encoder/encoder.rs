@@ -110,8 +110,6 @@ pub struct Encoder<'v, 'tcx: 'v> {
     pub typaram_repl: RefCell<Vec<HashMap<ty::Ty<'tcx>, ty::Ty<'tcx>>>>,
     encoding_errors_counter: RefCell<usize>,
     name_interner: RefCell<NameInterner>,
-    /// The procedure that is currently being encoded.
-    pub current_proc: RefCell<Option<ProcedureDefId>>
 }
 
 impl<'v, 'tcx> Encoder<'v, 'tcx> {
@@ -172,7 +170,6 @@ impl<'v, 'tcx> Encoder<'v, 'tcx> {
             array_types_encoder: RefCell::new(ArrayTypesEncoder::new()),
             encoding_errors_counter: RefCell::new(0),
             name_interner: RefCell::new(NameInterner::new()),
-            current_proc: RefCell::new(None),
         }
     }
 
@@ -1271,7 +1268,6 @@ impl<'v, 'tcx> Encoder<'v, 'tcx> {
         self.initialize();
         while !self.encoding_queue.borrow().is_empty() {
             let (proc_def_id, substs) = self.encoding_queue.borrow_mut().pop().unwrap();
-            self.current_proc.replace(Some(proc_def_id.clone()));
 
             let proc_name = self.env.get_absolute_item_name(proc_def_id);
             let proc_def_path = self.env.get_item_def_path(proc_def_id);
@@ -1305,7 +1301,6 @@ impl<'v, 'tcx> Encoder<'v, 'tcx> {
                 }
             }
 
-            self.current_proc.replace(None);
         }
     }
 
