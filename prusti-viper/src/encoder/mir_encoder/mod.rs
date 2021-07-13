@@ -527,7 +527,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> MirEncoder<'p, 'v, 'tcx> {
         left: vir::Expr,
         right: vir::Expr,
         ty: ty::Ty<'tcx>,
-    ) -> EncodingResult<vir::Expr> {
+    ) -> EncodingResult<vir::Expr> {         
         let is_bool = ty.kind() == &ty::TyKind::Bool;
         Ok(match op {
             mir::BinOp::Eq => vir::Expr::eq_cmp(left, right),
@@ -544,20 +544,13 @@ impl<'p, 'v: 'p, 'tcx: 'v> MirEncoder<'p, 'v, 'tcx> {
             mir::BinOp::BitAnd if is_bool => vir::Expr::and(left, right),
             mir::BinOp::BitOr if is_bool => vir::Expr::or(left, right),
             mir::BinOp::BitXor if is_bool => vir::Expr::xor(left, right),
-            mir::BinOp::BitAnd |
-            mir::BinOp::BitOr |
-            mir::BinOp::BitXor => {
-                return Err(EncodingError::unsupported(
-                    "bitwise operations on non-boolean types are not supported"
-                ))
-            }
             unsupported_op => {
                 return Err(EncodingError::unsupported(format!(
                     "operation '{:?}' is not supported",
                     unsupported_op
                 )))
             }
-        })
+        }) 
     }
 
     pub fn encode_unary_op_expr(&self, op: mir::UnOp, expr: vir::Expr) -> vir::Expr {

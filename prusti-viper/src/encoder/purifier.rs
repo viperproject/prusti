@@ -208,7 +208,8 @@ fn translate_type(encoder: &Encoder, typ: vir::Type) -> vir::Type {
         vir::Type::Int
         | vir::Type::Bool
         | vir::Type::Snapshot(_)
-        | vir::Type::Domain(_) => typ,
+        | vir::Type::Domain(_)
+        | vir::Type::Float(_) => typ,
         vir::Type::TypedRef(ref name) => {
             let mir_typ = encoder.decode_type_predicate(name).unwrap(); // FIXME: unwrap
             encoder.encode_snapshot_type(mir_typ).unwrap() // FIXME: unwrap

@@ -14,7 +14,6 @@ use ast_factory::AstFactory;
 use jni::objects::JObject;
 use viper_sys::wrappers::viper::silver::ast;
 
-
 impl<'a> AstFactory<'a> {
     pub fn add_with_pos(&self, left: Expr, right: Expr, pos: Position) -> Expr<'a> {
         build_ast_node_with_pos!(
@@ -196,6 +195,89 @@ impl<'a> AstFactory<'a> {
 
     pub fn int_lit_from_ref(&self, i: &dyn ToString) -> Expr<'a> {
         self.int_lit_from_ref_with_pos(i, self.no_position())
+    }
+
+    // Backend Bitvectors
+    pub fn backend_bv32_lit(&self, bits: u32) -> Expr<'a> {   
+        let bv_factory_ = ast::utility::BVFactory::with(self.env);
+        let bv_factory = ast::utility::BVFactory::new(&bv_factory_, 32).unwrap();
+        let from_int = ast::utility::BVFactory::call_from__int(&bv_factory_, bv_factory, self.jni.new_string("toBV32")).unwrap();
+        self.backend_func_app(from_int, &[self.int_lit(bits as i64)], self.no_position())
+    }
+
+    pub fn backend_bv64_lit(&self, bits: u64) -> Expr<'a> {
+        let bv_factory_ = ast::utility::BVFactory::with(self.env);
+        let bv_factory = ast::utility::BVFactory::new(&bv_factory_, 64).unwrap();
+        let from_int = ast::utility::BVFactory::call_from__int(&bv_factory_, bv_factory, self.jni.new_string("toBV64")).unwrap();
+        self.backend_func_app(from_int, &[self.int_lit(bits as i64)], self.no_position())
+    }
+    
+    // Backend Floating-Points    
+    pub fn float_binop(&self, op_kind: BinOpFloat, f_size: FloatSizeViper, left: Expr, right: Expr) -> Expr<'a> {
+        let rm = ast::utility::RoundingMode::with(self.env).call_RNE().unwrap(); // Rounding mode
+        let factory_ = ast::utility::FloatFactory::with(self.env); // FloatFactory
+        let factory = match f_size { //
+            FloatSizeViper::F32 => ast::utility::FloatFactory::new(&factory_, 24,8, rm).unwrap(),
+            FloatSizeViper::F64 => ast::utility::FloatFactory::new(&factory_, 52,12, rm).unwrap(),
+        };
+        let op = match op_kind { // create FloatFactory function to call
+            BinOpFloat::Add => ast::utility::FloatFactory::call_add(&factory_, factory, self.jni.new_string("fp_add")).unwrap(),
+            BinOpFloat::Sub => ast::utility::FloatFactory::call_sub(&factory_, factory, self.jni.new_string("fp_sub")).unwrap(),
+            BinOpFloat::Mul => ast::utility::FloatFactory::call_mul(&factory_, factory, self.jni.new_string("fp_mul")).unwrap(),
+            BinOpFloat::Div => ast::utility::FloatFactory::call_div(&factory_, factory, self.jni.new_string("fp_div")).unwrap(),
+            BinOpFloat::Min => ast::utility::FloatFactory::call_min(&factory_, factory, self.jni.new_string("fp_min")).unwrap(),
+            BinOpFloat::Max => ast::utility::FloatFactory::call_max(&factory_, factory, self.jni.new_string("fp_max")).unwrap(),
+            BinOpFloat::Eq => ast::utility::FloatFactory::call_eq(&factory_, factory, self.jni.new_string("fp_eq")).unwrap(),
+            BinOpFloat::Leq => ast::utility::FloatFactory::call_leq(&factory_, factory, self.jni.new_string("fp_leq")).unwrap(),
+            BinOpFloat::Geq => ast::utility::FloatFactory::call_geq(&factory_, factory, self.jni.new_string("fp_geq")).unwrap(),
+            BinOpFloat::Lt => ast::utility::FloatFactory::call_lt(&factory_, factory, self.jni.new_string("fp_lt")).unwrap(),
+            BinOpFloat::Gt => ast::utility::FloatFactory::call_gt(&factory_, factory, self.jni.new_string("fp_gt")).unwrap(),
+        };
+        self.backend_func_app(op, &[left, right], self.no_position())
+    }
+
+    pub fn float_unop(&self, op_kind: UnOpFloat, f_size: FloatSizeViper, arg: Expr) -> Expr<'a> {
+        let rm = ast::utility::RoundingMode::with(self.env).call_RNE().unwrap(); // Rounding mode
+        let factory_ = ast::utility::FloatFactory::with(self.env); // FloatFactory
+        let factory = match f_size { // FloatFactory JObject
+            FloatSizeViper::F32 => ast::utility::FloatFactory::new(&factory_, 24,8, rm).unwrap(),
+            FloatSizeViper::F64 => ast::utility::FloatFactory::new(&factory_, 52,12, rm).unwrap(),
+        };
+
+        let op = match op_kind {
+            UnOpFloat::Neg => ast::utility::FloatFactory::call_neg(&factory_, factory, self.jni.new_string("fp_neg")).unwrap(),
+            UnOpFloat::Abs => ast::utility::FloatFactory::call_abs(&factory_, factory, self.jni.new_string("fp_abs")).unwrap(),
+            UnOpFloat::IsZero => ast::utility::FloatFactory::call_isZero(&factory_, factory, self.jni.new_string("fp_isZero")).unwrap(),
+            UnOpFloat::IsInfinite => ast::utility::FloatFactory::call_isInfinite(&factory_, factory, self.jni.new_string("fp_isInfinite")).unwrap(),
+            UnOpFloat::IsNan => ast::utility::FloatFactory::call_isNaN(&factory_, factory, self.jni.new_string("fp_isNaN")).unwrap(),
+            UnOpFloat::IsNegative => ast::utility::FloatFactory::call_isNegative(&factory_, factory, self.jni.new_string("fp_isNegative")).unwrap(),
+            UnOpFloat::IsPositive => ast::utility::FloatFactory::call_isPositive(&factory_, factory, self.jni.new_string("fp_isPositive")).unwrap(),
+            UnOpFloat::GetType => ast::utility::FloatFactory::call_typ(&factory_, factory).unwrap(),
+            UnOpFloat::FromBV => todo!(),
+            UnOpFloat::ToBV => todo!(),
+        };
+
+        self.backend_func_app(op, &[arg], self.no_position())
+    }
+
+    pub fn backend_f32_lit(&self, bits: u32) -> Expr<'a> {
+        let bv = self.backend_bv32_lit(bits);
+        let rm = ast::utility::RoundingMode::with(self.env).call_RNE().unwrap(); // Rounding mode
+        let float_factory_ = ast::utility::FloatFactory::with(self.env); // FloatFactory
+        let float_factory = ast::utility::FloatFactory::new(&float_factory_, 24,8, rm).unwrap(); // FloatFactory JObject
+        let from_bv = ast::utility::FloatFactory::call_from__bv(&float_factory_, float_factory, self.jni.new_string("tofp")).unwrap();
+        self.backend_func_app(from_bv, &[bv], self.no_position())
+
+    }    
+    
+    pub fn backend_f64_lit(&self, bits: u64) -> Expr<'a> {
+        let bv = self.backend_bv64_lit(bits);
+        let rm = ast::utility::RoundingMode::with(self.env).call_RNE().unwrap(); // Rounding mode
+        let float_factory_ = ast::utility::FloatFactory::with(self.env); // FloatFactory
+        let float_factory = ast::utility::FloatFactory::new(&float_factory_, 52,12, rm).unwrap(); // FloatFactory JObject
+        let from_bv = ast::utility::FloatFactory::call_from__bv(&float_factory_, float_factory, self.jni.new_string("tofp")).unwrap();
+        self.backend_func_app(from_bv, &[bv], self.no_position())
+
     }
 
     pub fn minus_with_pos(&self, expr: Expr, pos: Position) -> Expr<'a> {
@@ -524,7 +606,7 @@ impl<'a> AstFactory<'a> {
         Expr::new(obj)
     }
      */
-    pub fn domain_func_app(
+     pub fn domain_func_app(
         &self,
         domain_func: DomainFunc,
         args: &[Expr],
@@ -543,6 +625,25 @@ impl<'a> AstFactory<'a> {
                 self.no_trafos(),
             ),
         );
+        Expr::new(obj)
+    }
+
+    pub fn backend_func_app(
+        &self,
+        backend_function: JObject,
+        args: &[Expr],
+        pos: Position,
+    ) -> Expr<'a> {
+        let backendfunc_app_object_wrapper = ast::BackendFuncApp_object::with(self.env);
+        let obj = self.jni.unwrap_result(
+            backendfunc_app_object_wrapper.call_apply(
+                    self.jni.unwrap_result(backendfunc_app_object_wrapper.singleton()),
+                    backend_function,
+                    self.jni.new_seq(&map_to_jobjects!(args)),
+                    pos.to_jobject(),
+                    self.no_info(),
+                    self.no_trafos(),
+        ));
         Expr::new(obj)
     }
 
@@ -935,4 +1036,28 @@ impl<'a> AstFactory<'a> {
         );
         Expr::new(obj)
     }
+}
+
+
+// Floating-Point Operations
+#[derive(Debug)]
+pub enum UnOpFloat {
+    Neg, Abs, 
+    IsZero, IsInfinite, IsNan, IsNegative, IsPositive,
+    GetType, FromBV, ToBV,
+}
+pub enum BinOpFloat {
+    Add, Sub, Mul, Div,
+    Eq, Leq, Geq, Lt, Gt,
+    Min, Max, 
+}
+pub enum FloatOpKind {
+    UnOpFloat, 
+    BinOpFloat,
+}
+
+// Floating-Point Size
+pub enum FloatSizeViper {
+    F32,
+    F64,
 }

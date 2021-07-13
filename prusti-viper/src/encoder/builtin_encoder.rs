@@ -5,6 +5,8 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use prusti_common::{vir, vir_local, vir::WithIdentifier};
+use prusti_common::vir::FloatSize;
+use rustc_middle::ty;
 
 const PRIMITIVE_VALID_DOMAIN_NAME: &str = "PrimitiveValidDomain";
 
@@ -13,6 +15,8 @@ pub enum BuiltinMethodKind {
     HavocBool,
     HavocInt,
     HavocRef,
+    HavocF32,
+    HavocF64,
 }
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
@@ -59,6 +63,7 @@ impl BuiltinEncoder {
             BuiltinMethodKind::HavocBool => "builtin$havoc_bool".to_string(),
             BuiltinMethodKind::HavocInt => "builtin$havoc_int".to_string(),
             BuiltinMethodKind::HavocRef => "builtin$havoc_ref".to_string(),
+            BuiltinMethodKind::HavocF32 | BuiltinMethodKind::HavocF64 => "builtin$havoc_float".to_string(),
         }
     }
 
@@ -67,6 +72,8 @@ impl BuiltinEncoder {
             BuiltinMethodKind::HavocBool => vir::Type::Bool,
             BuiltinMethodKind::HavocInt => vir::Type::Int,
             BuiltinMethodKind::HavocRef => vir::Type::TypedRef("".to_string()),
+            BuiltinMethodKind::HavocF32 => vir::Type::Float(FloatSize::F32),
+            BuiltinMethodKind::HavocF64 => vir::Type::Float(FloatSize::F64),
         };
         vir::BodylessMethod {
             name: self.encode_builtin_method_name(method),
@@ -101,6 +108,8 @@ impl BuiltinEncoder {
             BuiltinFunctionKind::ArrayLookupPure { .. }
             | BuiltinFunctionKind::SliceLookupPure { .. } => "lookup_pure".to_string(),
             BuiltinFunctionKind::SliceLen { .. } => "Slice$len".to_string(),
+            BuiltinFunctionKind::Unreachable(vir::Type::Float(_)) => "builtin$unreach_float".to_string(),
+            BuiltinFunctionKind::Undefined(vir::Type::Float(_)) => "builtin$undef_float".to_string(),
         }
     }
 

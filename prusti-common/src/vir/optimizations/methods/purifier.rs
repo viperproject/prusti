@@ -423,6 +423,7 @@ impl ast::StmtFolder for VarPurifier {
                 ast::Type::Domain(_)
                 | ast::Type::Snapshot(_)
                 | ast::Type::Seq(_) => unreachable!(),
+                ast::Type::Float(_) => "builtin$havoc_float",
             }.to_string();
             targets = vec![replacement];
         }

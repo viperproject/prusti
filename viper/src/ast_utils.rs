@@ -38,11 +38,11 @@ impl<'a> AstUtils<'a> {
         self.jni.get_string(
             self.jni.unwrap_result(
                 fast_pretty_printer_wrapper.call_pretty(
-                    self.jni
-                        .unwrap_result(fast_pretty_printer_wrapper.singleton()),
-                    program.to_jobject(),
-                ),
-            ),
+                    self.jni.unwrap_result(
+                            fast_pretty_printer_wrapper.singleton()),
+                            program.to_jobject()
+                    )
+            )
         )
     }
 

@@ -5,7 +5,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use super::super::borrows::Borrow;
-use crate::vir::ast::*;
+use crate::vir::{ast::*, FloatSize::*};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::hash::{Hash, Hasher};
@@ -73,6 +73,7 @@ pub enum PlaceComponent {
 pub enum UnaryOpKind {
     Not,
     Minus,
+    IsNaN,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -102,10 +103,17 @@ pub enum ContainerOpKind {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum FloatConst {
+    FloatConst64(u64),
+    FloatConst32(u32),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Const {
     Bool(bool),
     Int(i64),
     BigInt(String),
+    Float(FloatConst),
     /// All function pointers share the same constant, because their function
     /// is determined by the type system.
     FnPtr,
@@ -253,6 +261,7 @@ impl fmt::Display for UnaryOpKind {
         match self {
             UnaryOpKind::Not => write!(f, "!"),
             UnaryOpKind::Minus => write!(f, "-"),
+            UnaryOpKind::IsNaN => write!(f, "is_nan")
         }
     }
 }
@@ -284,6 +293,8 @@ impl fmt::Display for Const {
             Const::Bool(val) => write!(f, "{}", val),
             Const::Int(val) => write!(f, "{}", val),
             Const::BigInt(ref val) => write!(f, "{}", val),
+            Const::Float(FloatConst::FloatConst32(val)) => write!(f, "{}", val),
+            Const::Float(FloatConst::FloatConst64(val)) => write!(f, "{}", val),
             Const::FnPtr => write!(f, "FnPtr"),
         }
     }
@@ -309,10 +320,10 @@ impl Expr {
             | Expr::LetExpr(_, _, _, p)
             | Expr::FuncApp(_, _, _, _, p)
             | Expr::DomainFuncApp(_, _, p)
-            | Expr::InhaleExhale(_, _, p)
             | Expr::ContainerOp(_, _, _, p)
             | Expr::Seq(_, _, p)
-            | Expr::SnapApp(_, p) => *p,
+            | Expr::SnapApp(_, p)
+            | Expr::InhaleExhale(_, _, p) => *p,
             // TODO Expr::DomainFuncApp(_, _, _, _, _, p) => p,
             Expr::Downcast(box ref base, ..) => base.pos(),
         }
@@ -398,6 +409,10 @@ impl Expr {
 
     pub fn minus(expr: Expr) -> Self {
         Expr::UnaryOp(UnaryOpKind::Minus, box expr, Position::default())
+    }
+
+    pub fn is_nan(e: Expr) -> Self{
+        Expr::UnaryOp(UnaryOpKind::IsNaN, box e, Position::default())
     }
 
     pub fn gt_cmp(left: Expr, right: Expr) -> Self {
@@ -1035,6 +1050,8 @@ impl Expr {
                 match constant {
                     Const::Bool(..) => &Type::Bool,
                     Const::Int(..) | Const::BigInt(..) => &Type::Int,
+                    Const::Float(FloatConst::FloatConst32(_)) => &Type::Float(F32),
+                    Const::Float(FloatConst::FloatConst64(_)) => &Type::Float(F64),
                     Const::FnPtr => &FN_PTR_TYPE,
                 }
             }
@@ -1059,6 +1076,7 @@ impl Expr {
                         assert_eq!(typ1, typ2, "expr: {:?}", self);
                         typ1
                     }
+
                 }
             }
             Expr::Cond(_, box ref base1, box ref base2, _pos) => {

@@ -18,6 +18,7 @@ use crate::encoder::mir_encoder::PRECONDITION_LABEL;
 use crate::encoder::mir_successor::MirSuccessor;
 use crate::encoder::places::{Local, LocalVariableManager, Place};
 use crate::encoder::Encoder;
+use prusti_common::vir::BinOpKind;
 use prusti_common::{
     config,
     report::log,
@@ -28,7 +29,7 @@ use prusti_common::{
         borrows::Borrow,
         collect_assigned_vars,
         fixes::fix_ghost_vars,
-        CfgBlockIndex, Expr, ExprIterator, Successor, Type,
+        CfgBlockIndex, Expr, ExprIterator, Successor, Type, FloatSize, UnaryOpKind,
     },
 };
 use prusti_interface::{
@@ -67,6 +68,7 @@ use prusti_interface::environment::borrowck::regions::PlaceRegionsError;
 use crate::encoder::errors::EncodingErrorKind;
 use crate::encoder::snapshot;
 use std::convert::TryInto;
+use viper::{BinOpFloat, UnOpFloat};
 
 pub struct ProcedureEncoder<'p, 'v: 'p, 'tcx: 'v> {
     encoder: &'p Encoder<'v, 'tcx>,
@@ -886,6 +888,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 vir::Type::Domain(_) => BuiltinMethodKind::HavocRef,
                 vir::Type::Snapshot(_) => BuiltinMethodKind::HavocRef,
                 vir::Type::Seq(_) => BuiltinMethodKind::HavocRef,
+                vir::Type::Float(FloatSize::F32) => BuiltinMethodKind::HavocF32,
+                vir::Type::Float(FloatSize::F64) => BuiltinMethodKind::HavocF64,
             };
             let stmt = vir::Stmt::MethodCall(
                 self.encoder.encode_builtin_method_use(builtin_method),
@@ -2186,6 +2190,40 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                             );
                         }
 
+                        "core::f32::<impl f32>::is_nan" |
+                        "core::f64::<impl f64>::is_nan" => {
+                            let span = self.mir_encoder.get_span_of_location(location);
+
+                            let label = self.cfg_method.get_fresh_label_name();
+                            stmts.push(vir::Stmt::Label(label.clone()));
+
+                            // Havoc the content of the lhs
+                            let (target_place, pre_stmts) = self.encode_pure_function_call_lhs_place(destination);
+                            stmts.extend(pre_stmts);
+                            stmts.extend(self.encode_havoc(&target_place));
+                            let type_predicate = self
+                                .mir_encoder
+                                .encode_place_predicate_permission(target_place.clone(), vir::PermAmount::Write)
+                                .unwrap();
+
+                            stmts.push(vir::Stmt::Inhale(
+                                type_predicate,
+                            ));
+
+                            // Store a label for permissions got back from the call
+                            self.label_after_location.insert(location, label.clone());
+
+                            let lhs = vir::Expr::field(target_place.clone(),vir::Field::new("val_bool", vir::Type::Bool));
+
+                            let operand = self.mir_encoder.encode_operand_expr(&args[0]).with_span(span)?;
+                            let expr = Expr::is_nan(operand);
+
+                            stmts.push(vir::Stmt::Assign(lhs, expr, vir::AssignKind::Ghost));
+
+                            self.encode_transfer_args_permissions(location, args, &mut stmts, label, false)?;
+
+                        }
+
                         "std::ops::Fn::call" => {
                             let cl_type: ty::Ty = substs[0].expect_ty();
                             match cl_type.kind() {
@@ -2244,7 +2282,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                                     let arg_expr = self.mir_encoder.encode_operand_expr(operand);
                                     arg_exprs.push(arg_expr);
                                 }
-
                                 stmts.extend(
                                     self.encode_pure_function_call(
                                         location,
@@ -2324,7 +2361,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                     let assert_msg = msg.description().to_string();
                     (assert_msg.clone(), ErrorCtxt::AssertTerminator(assert_msg))
                 };
-
                 stmts.push(vir::Stmt::comment(format!("Rust assertion: {}", assert_msg)));
                 if self.check_panics {
                     stmts.push(vir::Stmt::Assert(
@@ -5645,6 +5681,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             ty::TyKind::Bool
             | ty::TyKind::Int(_)
             | ty::TyKind::Uint(_)
+            | ty::TyKind::Float(_)
             | ty::TyKind::Char => {
                 self.encode_copy_primitive_value(src, dst, self_ty, location)?
             }
