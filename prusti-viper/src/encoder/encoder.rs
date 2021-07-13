@@ -1297,6 +1297,20 @@ impl<'v, 'tcx> Encoder<'v, 'tcx> {
                 proc_name, proc_span, proc_def_path
             );
             assert!(substs.is_empty());
+            if self.is_pure(proc_def_id) {
+                // Check that the pure Rust function satisfies the basic
+                // requirements by trying to encode it as a Viper function,
+                // which will automatically run the validity checks.
+
+                // TODO: Make sure that this encoded function does not end up in
+                // the Viper file because that would be unsound.
+                if let Err(error) = self.encode_pure_function_def(proc_def_id, Vec::new()) {
+                    self.register_encoding_error(error);
+                    debug!("Error encoding function: {:?}", proc_def_id);
+                    // Skip encoding the function as a method.
+                    continue;
+                }
+            }
             if self.is_trusted(proc_def_id) {
                 debug!(
                     "Trusted procedure will not be encoded or verified: {:?}",
