@@ -273,13 +273,24 @@ impl VarPurifier {
             unreachable!()
         }
     }
-    fn get_replacement_bounds(&self, var_expr: &ast::Expr) -> ast::Expr {
+    fn get_replacement_bounds(&self, predicate_name: &str, var_expr: &ast::Expr) -> ast::Expr {
         let replacement = self.get_replacement(var_expr);
         if config::check_overflows() {
-            ast::Expr::and(
-                ast::Expr::ge_cmp(replacement.clone().into(), 0.into()),
-                ast::Expr::ge_cmp(std::usize::MAX.into(), replacement.into()),
-            )
+            match predicate_name {
+                "usize" => {
+                    ast::Expr::and(
+                        ast::Expr::ge_cmp(replacement.clone().into(), std::usize::MIN.into()),
+                        ast::Expr::ge_cmp(std::usize::MAX.into(), replacement.into()),
+                    )
+                }
+                "isize" => {
+                    ast::Expr::and(
+                        ast::Expr::ge_cmp(replacement.clone().into(), std::isize::MIN.into()),
+                        ast::Expr::ge_cmp(std::isize::MAX.into(), replacement.into()),
+                    )
+                }
+                _ => unreachable!()
+            }
         } else if config::encode_unsigned_num_constraint() {
             ast::Expr::ge_cmp(replacement.into(), 0.into())
         } else {
@@ -305,7 +316,7 @@ impl ast::ExprFolder for VarPurifier {
         pos: ast::Position,
     ) -> ast::Expr {
         if is_purifiable_predicate(&name) && self.is_pure(&arg) {
-            self.get_replacement_bounds(&arg)
+            self.get_replacement_bounds(&name, &arg)
         } else {
             ast::Expr::PredicateAccessPredicate(name, self.fold_boxed(arg), perm_amount, pos)
         }
@@ -367,7 +378,7 @@ impl ast::StmtFolder for VarPurifier {
     ) -> ast::Stmt {
         assert!(args.len() == 1);
         if is_purifiable_predicate(&predicate_name) && self.is_pure(&args[0]) {
-            let new_expr = self.get_replacement_bounds(&args[0]);
+            let new_expr = self.get_replacement_bounds(&predicate_name, &args[0]);
             ast::Stmt::Inhale(new_expr)
         } else {
             ast::Stmt::Unfold(
@@ -389,7 +400,7 @@ impl ast::StmtFolder for VarPurifier {
     ) -> ast::Stmt {
         assert!(args.len() == 1);
         if is_purifiable_predicate(&predicate_name) && self.is_pure(&args[0]) {
-            let new_expr = self.get_replacement_bounds(&args[0]);
+            let new_expr = self.get_replacement_bounds(&predicate_name, &args[0]);
             ast::Stmt::Assert(new_expr, pos)
         } else {
             ast::Stmt::Fold(

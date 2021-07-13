@@ -18,13 +18,28 @@ use ::log::warn;
 ///
 /// A `PrustiError` can be displayed as a *warning* to the user. (We should rename `PrustiError`,
 /// `SpannedEncodingError` and similar types to something less confusing.)
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PrustiError {
     is_error: bool,
+    /// If `true`, it should not be reported to the user. We need this in cases
+    /// when the same error could be reported twice.
+    is_disabled: bool,
     message: String,
     span: MultiSpan,
     help: Option<String>,
     note: Option<(String, MultiSpan)>,
+}
+
+impl PartialOrd for PrustiError {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.span.primary_span().partial_cmp(&other.span.primary_span())
+    }
+}
+
+impl Ord for PrustiError {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.partial_cmp(other).unwrap()
+    }
 }
 
 impl PrustiError {
@@ -32,6 +47,7 @@ impl PrustiError {
     fn new(message: String, span: MultiSpan) -> Self {
         PrustiError {
             is_error: true,
+            is_disabled: false,
             message,
             span,
             help: None,
@@ -46,6 +62,16 @@ impl PrustiError {
             format!("[Prusti: verification error] {}", message.to_string()),
             span
         )
+    }
+
+    pub fn disabled_verification<S: ToString>(message: S, span: MultiSpan) -> Self {
+        check_message(message.to_string());
+        let mut error = PrustiError::new(
+            format!("[Prusti: verification error] {}", message.to_string()),
+            span
+        );
+        error.is_disabled = true;
+        error
     }
 
     /// Report an unsupported feature of the verified Rust code (e.g. dereferencing raw pointers)
@@ -88,6 +114,10 @@ impl PrustiError {
         self.is_error
     }
 
+    pub fn is_disabled(&self) -> bool {
+        self.is_disabled
+    }
+
     pub fn set_help<S: ToString>(mut self, message: S) -> Self {
         self.help = Some(message.to_string());
         self
@@ -100,6 +130,7 @@ impl PrustiError {
 
     /// Report the encoding error using the compiler's interface
     pub fn emit(self, env: &Environment) {
+        assert!(!self.is_disabled);
         if self.is_error {
             env.span_err_with_help_and_note(
                 self.span,
@@ -115,6 +146,11 @@ impl PrustiError {
                 &self.note,
             );
         }
+    }
+
+    /// Cancel the error.
+    pub fn cancel(self) {
+        assert!(self.is_disabled);
     }
 
     /// Set the span of the failing assertion expression.

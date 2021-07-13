@@ -54,7 +54,8 @@ pub fn verify<'tcx>(
         match verification_result {
             VerificationResult::Success => {
                 if env.has_errors() {
-                    user::message("Verification result is inconclusive.");
+                    user::message("Verification result is inconclusive because errors \
+                                       were encountered during encoding.");
                 } else {
                     user::message(format!(
                         "Successful verification of {} items",
@@ -64,7 +65,7 @@ pub fn verify<'tcx>(
             }
             VerificationResult::Failure => {
                 user::message("Verification failed");
-                debug_assert!(env.has_errors());
+                assert!(env.has_errors());
             }
         };
     }

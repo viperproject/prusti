@@ -101,3 +101,12 @@ impl WithIdentifier for Function {
         compute_identifier(&self.name, &self.formal_args, &self.return_type)
     }
 }
+
+#[derive(PartialEq, Eq, Hash, Clone)]
+pub struct FunctionIdentifier(String);
+
+impl From<String> for FunctionIdentifier {
+    fn from(string: String) -> Self {
+        Self(string)
+    }
+}

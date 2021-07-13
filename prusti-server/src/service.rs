@@ -17,7 +17,7 @@ use std::{
     thread,
 };
 use tokio;
-use viper::VerificationResult;
+use viper::ProgramVerificationResult;
 use warp::{self, Buf, Filter};
 
 #[derive(Clone)]
@@ -173,7 +173,7 @@ impl PrustiServerConnection {
 
 impl VerificationService for PrustiServerConnection {
     /// panics if the verification request fails
-    fn verify(&self, request: VerificationRequest) -> VerificationResult {
+    fn verify(&self, request: VerificationRequest) -> ProgramVerificationResult {
         self.verify_checked(request)
             .expect("Verification request to server failed!")
             .expect("Server panicked while processing request!")

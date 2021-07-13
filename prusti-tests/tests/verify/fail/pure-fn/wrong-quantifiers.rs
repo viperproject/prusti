@@ -18,7 +18,7 @@ fn lookup(head: &List, index: usize) -> u32 {
     } else {
         match head.next {
             Some(box ref tail) => lookup(tail, index - 1),
-            None => unreachable!() //~ ERROR might be reachable
+            None => unreachable!() //~ ERROR unreachable!(..) statement might be reachable
         }
     }
 }
