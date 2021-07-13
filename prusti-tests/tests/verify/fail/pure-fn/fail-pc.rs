@@ -2,7 +2,6 @@ use prusti_contracts::*;
 
 #[pure]
 #[ensures(result == n*(n+1)/2)] //~ ERROR postcondition
-                                //~| ERROR postcondition might not hold.
 fn sum1(n: i32) -> i32 {
     if n <= 0 { 0 } else { sum1(n-1)+n }
 }

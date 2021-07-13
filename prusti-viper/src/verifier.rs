@@ -324,7 +324,11 @@ impl<'v, 'tcx> Verifier<'v, 'tcx> {
         prusti_errors.sort();
         for prusti_error in prusti_errors {
             debug!("Prusti error: {:?}", prusti_error);
-            prusti_error.emit(self.env);
+            if prusti_error.is_disabled() {
+                prusti_error.cancel();
+            } else {
+                prusti_error.emit(self.env);
+            }
             result = VerificationResult::Failure;
         }
 
