@@ -1007,7 +1007,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BackwardMirInterpreter<'tcx>
                     ErrorCtxt::BoundsCheckAssert
                 } else {
                     let assert_msg = msg.description().to_string();
-                    ErrorCtxt::AssertTerminator(assert_msg)
+                    ErrorCtxt::PureFunctionAssertTerminator(assert_msg)
                 };
 
                 let pos = self.encoder.error_manager().register(
