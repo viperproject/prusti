@@ -377,16 +377,29 @@ impl ExprFolder for Purifier<'_, '_, '_> {
         pos: vir::Position
     ) -> vir::Expr {
         let args: Vec<_> = args.into_iter().map(|e| ExprFolder::fold(self, e)).collect();
-        if name.starts_with("snap$") {
-            match args.as_slice() {
-                [vir::Expr::Local(local_var, local_pos)] => {
-                    if self.vars.contains(&local_var.name) ||
-                            self.change_var_types.contains_key(&local_var.name) {
+        match args.as_slice() {
+            [vir::Expr::Local(local_var, local_pos)] => {
+                if self.vars.contains(&local_var.name) ||
+                        self.change_var_types.contains_key(&local_var.name) {
+                    if name.starts_with("snap$") {
                         return vir::Expr::Local(local_var.clone(), local_pos.clone());
                     }
+                    if name.ends_with("$$discriminant$$") {
+                        let predicate_name = formal_args[0].typ.name();
+                        let domain_name = format!("Snap${}", predicate_name);
+                        let arg_dom_expr = vir::Expr::Local(local_var.clone(), local_pos.clone());
+                        let discriminant_func = vir::DomainFunc {
+                            name: "discriminant$".to_string(),
+                            formal_args: vec![local_var.clone()],
+                            return_type: vir::Type::Int,
+                            unique: false,
+                            domain_name: domain_name.to_string(),
+                        };
+                        return discriminant_func.apply(vec![arg_dom_expr.clone()]);
+                    }
                 }
-                _ => {}
             }
+            _ => {}
         }
         vir::Expr::FuncApp(
             name,
