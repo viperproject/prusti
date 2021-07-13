@@ -2601,7 +2601,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 .with_span(call_site_span)?;
             let arg_inv = self.encoder.encode_type_invariant_def(arg_ty)
                 .with_span(call_site_span)?;
-            type_invs.insert(inv_name, arg_inv);
+            type_invs.insert(inv_name, self.encoder.get_function(&arg_inv).clone());
 
             match encoded_operand {
                 Some(place) => {

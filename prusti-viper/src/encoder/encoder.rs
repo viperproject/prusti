@@ -39,7 +39,7 @@ use rustc_hir::def_id::DefId;
 use rustc_middle::mir;
 // use rustc::mir::interpret::GlobalId;
 use rustc_middle::ty;
-use std::cell::{RefCell, RefMut};
+use std::cell::{RefCell, RefMut, Ref};
 use std::collections::{HashMap, HashSet};
 use std::io::Write;
 use std::mem;
@@ -47,7 +47,7 @@ use std::mem;
 use crate::encoder::stub_procedure_encoder::StubProcedureEncoder;
 use std::ops::AddAssign;
 use std::convert::TryInto;
-use std::borrow::Borrow;
+use std::borrow::{Borrow, BorrowMut};
 use crate::encoder::specs_closures_collector::SpecsClosuresCollector;
 use rustc_span::MultiSpan;
 use crate::encoder::name_interner::NameInterner;
@@ -91,26 +91,28 @@ pub struct Encoder<'v, 'tcx: 'v> {
         ProcedureDefId,
         EncodingResult<ProcedureContractMirDef<'tcx>>
     >>,
+    /// A map containing all functions: identifier → function definition.
+    functions: RefCell<HashMap<vir::FunctionIdentifier, vir::Function>>,
     builtin_methods: RefCell<HashMap<BuiltinMethodKind, vir::BodylessMethod>>,
-    builtin_functions: RefCell<HashMap<BuiltinFunctionKind, vir::Function>>,
+    builtin_functions: RefCell<HashMap<BuiltinFunctionKind, vir::FunctionIdentifier>>,
     procedures: RefCell<HashMap<ProcedureDefId, vir::CfgMethod>>,
     programs: Vec<vir::Program>,
     pure_function_bodies: RefCell<HashMap<(ProcedureDefId, String), vir::Expr>>,
-    pure_functions: RefCell<HashMap<(ProcedureDefId, String), vir::Function>>,
+    pure_functions: RefCell<HashMap<(ProcedureDefId, String), vir::FunctionIdentifier>>,
     failed_pure_functions: RefCell<HashSet<(ProcedureDefId, String)>>,
     /// Stub pure functions. Generated when an impure Rust function is invoked
     /// where a pure function is required.
-    stub_pure_functions: RefCell<HashMap<(ProcedureDefId, String), vir::Function>>,
+    stub_pure_functions: RefCell<HashMap<(ProcedureDefId, String), vir::FunctionIdentifier>>,
     spec_functions: RefCell<HashMap<ProcedureDefId, Vec<vir::Function>>>,
     type_predicate_names: RefCell<HashMap<ty::TyKind<'tcx>, String>>,
     type_invariant_names: RefCell<HashMap<ty::TyKind<'tcx>, String>>,
     type_tag_names: RefCell<HashMap<ty::TyKind<'tcx>, String>>,
     predicate_types: RefCell<HashMap<String, ty::Ty<'tcx>>>,
     type_predicates: RefCell<HashMap<String, vir::Predicate>>,
-    type_invariants: RefCell<HashMap<String, vir::Function>>,
-    type_tags: RefCell<HashMap<String, vir::Function>>,
-    type_discriminant_funcs: RefCell<HashMap<String, vir::Function>>,
-    type_cast_functions: RefCell<HashMap<(ty::Ty<'tcx>, ty::Ty<'tcx>), vir::Function>>,
+    type_invariants: RefCell<HashMap<String, vir::FunctionIdentifier>>,
+    type_tags: RefCell<HashMap<String, vir::FunctionIdentifier>>,
+    type_discriminant_funcs: RefCell<HashMap<String, vir::FunctionIdentifier>>,
+    type_cast_functions: RefCell<HashMap<(ty::Ty<'tcx>, ty::Ty<'tcx>), vir::FunctionIdentifier>>,
     fields: RefCell<HashMap<String, vir::Field>>,
     snapshot_encoder: RefCell<SnapshotEncoder>,
     mirror_encoder: RefCell<MirrorEncoder>,
@@ -153,6 +155,7 @@ impl<'v, 'tcx> Encoder<'v, 'tcx> {
             def_spec,
             error_manager: RefCell::new(ErrorManager::new(env.codemap())),
             procedure_contracts: RefCell::new(HashMap::new()),
+            functions: RefCell::new(HashMap::new()),
             builtin_methods: RefCell::new(HashMap::new()),
             builtin_functions: RefCell::new(HashMap::new()),
             programs: Vec::new(),
@@ -249,15 +252,7 @@ impl<'v, 'tcx> Encoder<'v, 'tcx> {
     }
 
     pub fn finalize_viper_program(&self, name: String) -> vir::Program {
-        vir::Program {
-            name,
-            domains: self.get_used_viper_domains(),
-            fields: self.get_used_viper_fields(),
-            builtin_methods: self.get_used_builtin_methods(),
-            methods: self.get_used_viper_methods(),
-            functions: self.get_used_viper_functions(),
-            viper_predicates: self.get_used_viper_predicates(),
-        }
+        super::definition_collector::collect_definitions(self, name, self.get_used_viper_methods())
     }
 
     pub fn get_viper_programs(&mut self) -> Vec<vir::Program> {
@@ -298,59 +293,113 @@ impl<'v, 'tcx> Encoder<'v, 'tcx> {
         fields
     }
 
-    fn get_used_viper_functions(&self) -> Vec<vir::Function> {
-        let mut functions: Vec<_> = vec![];
-        for function in self.builtin_functions.borrow().values() {
-            functions.push(function.clone());
-        }
-        for function in self.pure_functions.borrow().values() {
-            functions.push(function.clone());
-        }
-        for function in self.stub_pure_functions.borrow().values() {
-            functions.push(function.clone());
-        }
-        for function in self.type_invariants.borrow().values() {
-            functions.push(function.clone());
-        }
-        for function in self.type_tags.borrow().values() {
-            functions.push(function.clone());
-        }
-        for function in self.type_discriminant_funcs.borrow().values() {
-            functions.push(function.clone());
-        }
-        for function in self.type_cast_functions.borrow().values() {
-            functions.push(function.clone());
-        }
-        functions.extend(self.snapshot_encoder.borrow().get_viper_functions());
-        functions.extend(self.mirror_encoder.borrow().get_viper_functions());
-        for sfs in self.spec_functions.borrow().values() {
-            for sf in sfs {
-                functions.push(sf.clone());
-            }
-        }
-        functions.sort_by_key(|f| f.get_identifier());
-        functions
+    // fn get_used_viper_functions(&self) -> Vec<vir::Function> {
+    //     let mut functions: Vec<_> = vec![];
+    //     for function in self.builtin_functions.borrow().values() {
+    //         functions.push(function.clone());
+    //     }
+    //     for function in self.pure_functions.borrow().values() {
+    //         functions.push(function.clone());
+    //     }
+    //     for function in self.stub_pure_functions.borrow().values() {
+    //         functions.push(function.clone());
+    //     }
+    //     for function in self.type_invariants.borrow().values() {
+    //         functions.push(function.clone());
+    //     }
+    //     for function in self.type_tags.borrow().values() {
+    //         functions.push(function.clone());
+    //     }
+    //     for function in self.type_discriminant_funcs.borrow().values() {
+    //         functions.push(function.clone());
+    //     }
+    //     for function in self.type_cast_functions.borrow().values() {
+    //         functions.push(function.clone());
+    //     }
+    //     functions.extend(self.snapshot_encoder.borrow().get_viper_functions());
+    //     functions.extend(self.mirror_encoder.borrow().get_viper_functions());
+    //     for sfs in self.spec_functions.borrow().values() {
+    //         for sf in sfs {
+    //             functions.push(sf.clone());
+    //         }
+    //     }
+    //     functions.sort_by_key(|f| f.get_identifier());
+    //     functions
+    // }
+
+    pub(super) fn insert_function(&self, function: vir::Function) -> vir::FunctionIdentifier {
+        let identifier: vir::FunctionIdentifier = function.get_identifier().into();
+        assert!(self.functions.borrow_mut().insert(identifier.clone(), function).is_none());
+        identifier
     }
 
-    fn get_used_viper_predicates(&self) -> Vec<vir::Predicate> {
-        let mut predicates: Vec<_> = self.type_predicates.borrow().values().cloned().collect();
+    pub(super) fn get_function<'a>(&'a self, identifier: &vir::FunctionIdentifier) -> Ref<'a, vir::Function> {
+        Ref::map(self.functions.borrow(), |map| {
+            &map[identifier]
+        })
 
-        // Add a predicate that represents the dead loan token.
-        predicates.push(vir::Predicate::Bodyless(
-            "DeadBorrowToken$".to_string(),
-            vir_local!{ borrow: Int },
-        ));
-
-        predicates.sort_by_key(|f| f.get_identifier());
-        predicates
+        // if let Some(key) = self.builtin_function_keys.borrow().get(identifier) {
+        //     Ref::map(self.builtin_functions.borrow(), |map| {
+        //         &map[key]
+        //     })
+        // } else if let Some(key) = self.pure_function_keys.borrow().get(identifier) {
+        //     Ref::map(self.pure_functions.borrow(), |map| {
+        //         &map[key]
+        //     })
+        // } else if let Some(key) = self.stub_pure_function_keys.borrow().get(identifier) {
+        //     Ref::map(self.stub_pure_functions.borrow(), |map| {
+        //         &map[key]
+        //     })
+        // } else if let Some(key) = self.type_invariant_keys.borrow().get(identifier) {
+        //     Ref::map(self.type_invariants.borrow(), |map| {
+        //         &map[key]
+        //     })
+        // } else if let Some(key) = self.type_tag_keys.borrow().get(identifier) {
+        //     Ref::map(self.type_tags.borrow(), |map| {
+        //         &map[key]
+        //     })
+        // } else if let Some(key) = self.type_discriminant_func_keys.borrow().get(identifier) {
+        //     Ref::map(self.type_discriminant_funcs.borrow(), |map| {
+        //         &map[key]
+        //     })
+        // } else if let Some(key) = self.type_cast_function_keys.borrow().get(identifier) {
+        //     Ref::map(self.type_cast_functions.borrow(), |map| {
+        //         &map[key]
+        //     })
+        // } else {
+        //     unreachable!("function identifier: {}", identifier);
+        // }
     }
+
+    // fn get_used_viper_predicates(&self) -> Vec<vir::Predicate> {
+    //     let mut predicates: Vec<_> = self.type_predicates.borrow().values().cloned().collect();
+
+        // // Add a predicate that represents the dead loan token.
+        // predicates.push(vir::Predicate::Bodyless(
+        //     "DeadBorrowToken$".to_string(),
+        //     vir_local!{ borrow: Int },
+        // ));
+
+    //     predicates.sort_by_key(|f| f.get_identifier());
+    //     predicates
+    // }
 
     pub fn get_used_viper_predicates_map(&self) -> HashMap<String, vir::Predicate> {
         self.type_predicates.borrow().clone()
     }
 
-    fn get_used_builtin_methods(&self) -> Vec<vir::BodylessMethod> {
-        self.builtin_methods.borrow().values().cloned().collect()
+    pub(super) fn get_viper_predicate(&self, name: &str) -> vir::Predicate {
+        self.type_predicates.borrow()[name].clone()
+    }
+
+    // fn get_used_builtin_methods(&self) -> Vec<vir::BodylessMethod> {
+    //     self.builtin_methods.borrow().values().cloned().collect()
+    // }
+
+    pub(super) fn get_builtin_methods<'a>(
+        &'a self
+    ) -> Ref<'a, HashMap<BuiltinMethodKind, vir::BodylessMethod>> {
+        self.builtin_methods.borrow()
     }
 
     fn get_used_viper_methods(&self) -> Vec<vir::CfgMethod> {
@@ -634,7 +683,7 @@ impl<'v, 'tcx> Encoder<'v, 'tcx> {
                     function,
                     self.get_used_viper_predicates_map(),
                 );
-                final_function.unwrap()
+                self.insert_function(final_function.unwrap())
             });
         vir::Expr::FuncApp(
             name,
@@ -672,9 +721,10 @@ impl<'v, 'tcx> Encoder<'v, 'tcx> {
             let builtin_encoder = BuiltinEncoder::new();
             let function = builtin_encoder.encode_builtin_function_def(function_kind.clone());
             self.log_vir_program_before_viper(function.to_string());
+            let identifier = function.get_identifier();
             self.builtin_functions
                 .borrow_mut()
-                .insert(function_kind.clone(), function);
+                .insert(function_kind.clone(), self.insert_function(function));
         }
     }
 
@@ -707,7 +757,8 @@ impl<'v, 'tcx> Encoder<'v, 'tcx> {
                 posts: postcondition,
                 body: Some(arg.into()),
             };
-            self.type_cast_functions.borrow_mut().insert((src_ty, dst_ty), function);
+            let identifier = self.insert_function(function);
+            self.type_cast_functions.borrow_mut().insert((src_ty, dst_ty), identifier);
         }
         Ok(function_name)
     }
@@ -980,15 +1031,16 @@ impl<'v, 'tcx> Encoder<'v, 'tcx> {
     }
 
     pub fn encode_type_invariant_def(&self, ty: ty::Ty<'tcx>)
-        -> EncodingResult<vir::Function>
+        -> EncodingResult<vir::FunctionIdentifier>
     {
         let invariant_name = self.encode_type_invariant_use(ty)?;
         if !self.type_invariants.borrow().contains_key(&invariant_name) {
             let type_encoder = TypeEncoder::new(self, ty);
             let invariant = type_encoder.encode_invariant_def()?;
+            let identifier = self.insert_function(invariant);
             self.type_invariants
                 .borrow_mut()
-                .insert(invariant_name.clone(), invariant);
+                .insert(invariant_name.clone(), identifier);
         }
         Ok(self.type_invariants.borrow()[&invariant_name].clone())
     }
@@ -1008,14 +1060,14 @@ impl<'v, 'tcx> Encoder<'v, 'tcx> {
         tag_name
     }
 
-    pub fn encode_type_tag_def(&self, ty: ty::Ty<'tcx>) -> vir::Function {
+    pub fn encode_type_tag_def(&self, ty: ty::Ty<'tcx>) {
         let tag_name = self.encode_type_tag_use(ty);
         if !self.type_tags.borrow().contains_key(&tag_name) {
             let type_encoder = TypeEncoder::new(self, ty);
             let tag = type_encoder.encode_tag_def();
-            self.type_tags.borrow_mut().insert(tag_name.clone(), tag);
+            let identifier = self.insert_function(tag);
+            self.type_tags.borrow_mut().insert(tag_name.clone(), identifier);
         }
-        self.type_tags.borrow()[&tag_name].clone()
     }
 
     pub fn encode_const_expr(
@@ -1202,7 +1254,8 @@ impl<'v, 'tcx> Encoder<'v, 'tcx> {
 
             self.log_vir_program_before_viper(function.to_string());
             self.failed_pure_functions.borrow_mut().remove(&key);
-            self.pure_functions.borrow_mut().insert(key, function);
+            let identifier = self.insert_function(function);
+            self.pure_functions.borrow_mut().insert(key, identifier);
         }
 
         trace!("[exit] encode_pure_function_def({:?})", proc_def_id);
@@ -1265,10 +1318,9 @@ impl<'v, 'tcx> Encoder<'v, 'tcx> {
         // If we haven't seen this particular stub before, generate and insert it.
         if !self.pure_functions.borrow().contains_key(&key) {
             let function = stub_encoder.encode_function()?;
-
             self.log_vir_program_before_viper(function.to_string());
-
-            self.stub_pure_functions.borrow_mut().insert(key, function);
+            let identifier = self.insert_function(function);
+            self.stub_pure_functions.borrow_mut().insert(key, identifier);
         }
         Ok((
             stub_encoder.encode_function_name(),
