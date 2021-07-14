@@ -67,6 +67,17 @@ fn get_used_predicates_in_predicate_map(
                 map.insert(p.name.clone(), res);
             }
             Predicate::Bodyless(_, _) => { /* ignore */ }
+            Predicate::CreditUnit(CreditUnitPredicate {
+                name,
+                body: Some(e),
+                ..
+            }) => {
+                ExprWalker::walk(&mut collector, e);
+                let mut res = BTreeSet::new();
+                std::mem::swap(&mut res, &mut collector.used_predicates);
+                map.insert(name.clone(), res);
+            }
+            Predicate::CreditUnit(CreditUnitPredicate { body: None, .. }) => { /* ignore */ }
         }
     }
     return map;
@@ -178,6 +189,19 @@ impl ExprWalker for UsedPredicateCollector {
     ) {
         self.used_predicates.insert(name.to_string());
         ExprWalker::walk(self, arg);
+    }
+
+    fn walk_credit_access_predicate(
+        &mut self,
+        name: &str,
+        args: &Vec<Expr>,
+        _frac_perm_amount: &FracPermAmount,
+        _pos: &Position
+    ) {
+        self.used_predicates.insert(name.to_string());
+        for arg in args {
+            ExprWalker::walk(self, arg);
+        }
     }
 
     fn walk_unfolding(

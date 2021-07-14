@@ -92,6 +92,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> SpecFunctionEncoder<'p, 'v, 'tcx> {
                     .map(|e| -> vir::Expr { e.into() }).collect::<Vec<_>>(),
                 None,
                 true,
+                false,                  // TODO: ?
                 None,
                 ErrorCtxt::GenericExpression,
             )?);
@@ -135,6 +136,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> SpecFunctionEncoder<'p, 'v, 'tcx> {
                     .map(|e| -> vir::Expr { e.into() }).collect::<Vec<_>>(),
                 Some(&encoded_return.clone().into()),
                 true,
+                false,              // TODO: ?
                 None,
                 ErrorCtxt::GenericExpression,
             )?);

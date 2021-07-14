@@ -87,4 +87,11 @@ pub fn old<T>(arg: T) -> T {
     arg
 }
 
+/*/// This function is used to specify asymptotic cost functions
+/// inside credits expressions
+#[allow(non_snake_case)]
+pub fn O<T>(arg: T) -> T {
+    arg
+}*/
+
 pub use private::*;

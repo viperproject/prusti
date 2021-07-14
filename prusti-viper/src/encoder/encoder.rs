@@ -59,6 +59,7 @@ use crate::encoder::mirror_function_encoder::MirrorEncoder;
 use crate::encoder::snapshot::encoder::SnapshotEncoder;
 use crate::encoder::purifier;
 use crate::encoder::array_encoder::{ArrayTypesEncoder, EncodedArrayTypes, EncodedSliceTypes};
+use itertools::Itertools;
 
 #[must_use]
 pub struct CleanupTyMapStack<'a, 'tcx> {
@@ -89,6 +90,7 @@ pub struct Encoder<'v, 'tcx: 'v> {
     /// where a pure function is required.
     stub_pure_functions: RefCell<HashMap<(ProcedureDefId, String), vir::Function>>,
     spec_functions: RefCell<HashMap<ProcedureDefId, Vec<vir::Function>>>,
+    credit_predicates: RefCell<HashMap<String, vir::Predicate>>,
     type_predicate_names: RefCell<HashMap<ty::TyKind<'tcx>, String>>,
     type_invariant_names: RefCell<HashMap<ty::TyKind<'tcx>, String>>,
     type_tag_names: RefCell<HashMap<ty::TyKind<'tcx>, String>>,
@@ -150,6 +152,7 @@ impl<'v, 'tcx> Encoder<'v, 'tcx> {
             failed_pure_functions: RefCell::new(HashSet::new()),
             stub_pure_functions: RefCell::new(HashMap::new()),
             spec_functions: RefCell::new(HashMap::new()),
+            credit_predicates: RefCell::new(HashMap::new()),
             type_predicate_names: RefCell::new(HashMap::new()),
             type_invariant_names: RefCell::new(HashMap::new()),
             type_tag_names: RefCell::new(HashMap::new()),
@@ -310,6 +313,8 @@ impl<'v, 'tcx> Encoder<'v, 'tcx> {
 
     fn get_used_viper_predicates(&self) -> Vec<vir::Predicate> {
         let mut predicates: Vec<_> = self.type_predicates.borrow().values().cloned().collect();
+
+        predicates.extend(self.credit_predicates.borrow().values().cloned());       //TODO: return in separate function?
 
         // Add a predicate that represents the dead loan token.
         predicates.push(vir::Predicate::Bodyless(
@@ -791,6 +796,7 @@ impl<'v, 'tcx> Encoder<'v, 'tcx> {
         target_args: &[vir::Expr],
         target_return: Option<&vir::Expr>,
         targets_are_values: bool,
+        only_exhaled: bool,
         assertion_location: Option<mir::BasicBlock>,
         error: ErrorCtxt,
     ) -> SpannedEncodingResult<vir::Expr> {
@@ -802,6 +808,7 @@ impl<'v, 'tcx> Encoder<'v, 'tcx> {
             target_args,
             target_return,
             targets_are_values,
+            only_exhaled,
             assertion_location,
         )?;
         Ok(encoded_assertion.set_default_pos(
@@ -820,6 +827,68 @@ impl<'v, 'tcx> Encoder<'v, 'tcx> {
                 format!("type predicate not known: {:?}", name)
             ))
         }
+    }
+
+    pub fn encode_credit_predicate_use(&self, credit_type: &str, mut exponents: Vec<u32>)
+        -> String           //TODO: use Result type?, removed, because don't ever return an error
+    {
+        let mut this_pred_name = credit_type.to_string();
+        for exp in exponents.iter() {
+            this_pred_name.push_str(&exp.to_string());
+        }
+
+        // add missing predicate def & sub-predicate defs
+        let mut pred_name = this_pred_name.clone();
+        while !self.credit_predicates.borrow().contains_key(&pred_name) {
+            //order of sub-predicates: reduce (last) highest exponent by 1      //TODO: simpler order: always reduce first exponent?
+            if let Some(max_idx) = exponents.iter().position_max() {
+                let curr_n_exps = exponents.len();
+                // ==> exponents vector is not empty
+                if exponents[max_idx] > 1 {
+                    exponents[max_idx] -= 1;
+                }
+                else {
+                    exponents.remove(max_idx);
+                }
+                // sub-predicate name
+                let mut sub_pred_name = credit_type.to_string();
+                for exp in exponents.iter() {
+                    sub_pred_name.push_str(&exp.to_string());
+                }
+
+                // construct predicate
+                let mut pred_args = vec![];
+                let mut sub_pred_args = vec![];
+                for i in 0..curr_n_exps {
+                    let local_var = vir::LocalVar::new(format!("_{}", i), vir::Type::Int);
+                    pred_args.push(local_var.clone());
+                    if i != max_idx || exponents.len() == curr_n_exps {
+                        sub_pred_args.push(vir::Expr::local(local_var));
+                    }
+                }
+                let max_idx_var = vir::Expr::local(vir::LocalVar::new(format!("_{}", max_idx), vir::Type::Int));
+                let perm_amount = vir::FracPermAmount::new(box max_idx_var, box 1.into());
+                let pred_body = vir::Expr::credit_access_predicate(&sub_pred_name, sub_pred_args, perm_amount);
+
+                let predicate = vir::Predicate::new_credit_unit(pred_name.clone(), pred_args, Some(pred_body));
+                self.log_vir_program_before_viper(predicate.to_string());
+                self.credit_predicates.borrow_mut().insert(pred_name.clone(), predicate);
+
+                pred_name = sub_pred_name
+            }
+            else {
+                //add constant predicate
+                let predicate = vir::Predicate::new_credit_unit(
+                    pred_name.clone(),
+                    vec![],
+                    None);
+                self.log_vir_program_before_viper(predicate.to_string());
+                self.credit_predicates.borrow_mut().insert(pred_name, predicate);
+                break;
+            }
+        }
+
+        this_pred_name
     }
 
     pub fn encode_type_predicate_use(&self, ty: ty::Ty<'tcx>)

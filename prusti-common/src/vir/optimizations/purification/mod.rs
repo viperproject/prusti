@@ -70,7 +70,7 @@ fn purify_method(method: &mut CfgMethod, predicates: &[Predicate]) {
     }
 }
 
-/// This is a ExprWalkerand StmtWalker used to collect information about which
+/// This is a ExprWalker and StmtWalker used to collect information about which
 /// local variables can be purified.
 ///
 /// The current implementation is only for ints/bools. So to check if a

@@ -11,6 +11,7 @@ use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::mem;
 use std::mem::discriminant;
+use itertools::Itertools;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Expr {
@@ -28,6 +29,8 @@ pub enum Expr {
     MagicWand(Box<Expr>, Box<Expr>, Option<Borrow>, Position),
     /// PredicateAccessPredicate: predicate_name, arg, permission amount
     PredicateAccessPredicate(String, Box<Expr>, PermAmount, Position),
+    /// arguments: predicate name (specifies exponents), arguments (variables), fractional amount/credit coefficient
+    CreditAccessPredicate(String, Vec<Expr>, FracPermAmount, Position),
     FieldAccessPredicate(Box<Expr>, PermAmount, Position),
     UnaryOp(UnaryOpKind, Box<Expr>, Position),
     BinOp(BinOpKind, Box<Expr>, Box<Expr>, Position),
@@ -139,6 +142,9 @@ impl fmt::Display for Expr {
             Expr::UnaryOp(op, ref expr, ref _pos) => write!(f, "{}({})", op, expr),
             Expr::PredicateAccessPredicate(ref pred_name, ref arg, perm, ref _pos) => {
                 write!(f, "acc({}({}), {})", pred_name, arg, perm)
+            }
+            Expr::CreditAccessPredicate(ref pred_name, ref args, ref frac_perm, _) => {
+                write!(f, "acc({}({}), {}", pred_name, args.iter().format(", "), frac_perm)
             }
             Expr::FieldAccessPredicate(ref expr, perm, ref _pos) => {
                 write!(f, "acc({}, {})", expr, perm)
@@ -300,6 +306,7 @@ impl Expr {
             | Expr::LabelledOld(_, _, p)
             | Expr::MagicWand(_, _, _, p)
             | Expr::PredicateAccessPredicate(_, _, _, p)
+            | Expr::CreditAccessPredicate(_, _, _, p)
             | Expr::FieldAccessPredicate(_, _, p)
             | Expr::UnaryOp(_, _, p)
             | Expr::BinOp(_, _, _, p)
@@ -330,6 +337,7 @@ impl Expr {
             Expr::PredicateAccessPredicate(x, y, z, _) => {
                 Expr::PredicateAccessPredicate(x, y, z, pos)
             }
+            Expr::CreditAccessPredicate(n, a, p, _) => Expr::CreditAccessPredicate(n, a, p, pos),
             Expr::FieldAccessPredicate(x, y, _) => Expr::FieldAccessPredicate(x, y, pos),
             Expr::UnaryOp(x, y, _) => Expr::UnaryOp(x, y, pos),
             Expr::BinOp(x, y, z, _) => Expr::BinOp(x, y, z, pos),
@@ -371,6 +379,11 @@ impl Expr {
     pub fn predicate_access_predicate<S: ToString>(name: S, place: Expr, perm: PermAmount) -> Self {
         let pos = place.pos();
         Expr::PredicateAccessPredicate(name.to_string(), box place, perm, pos)
+    }
+
+    pub fn credit_access_predicate<S: ToString>(name: S, args: Vec<Expr>, frac_perm: FracPermAmount) -> Self {
+        let pos = Position::default();          //TODO?
+        Expr::CreditAccessPredicate(name.to_string(), args, frac_perm, pos)
     }
 
     pub fn field_access_predicate(place: Expr, perm: PermAmount) -> Self {
@@ -639,7 +652,8 @@ impl Expr {
     pub fn is_only_permissions(&self) -> bool {
         match self {
             Expr::PredicateAccessPredicate(..) |
-            Expr::FieldAccessPredicate(..) => true,
+            Expr::FieldAccessPredicate(..) |
+            Expr::CreditAccessPredicate(..) => true,
             Expr::BinOp(BinOpKind::And, box lhs, box rhs, _) => {
                 lhs.is_only_permissions() && rhs.is_only_permissions()
             }
@@ -814,6 +828,15 @@ impl Expr {
             ) {
                 self.non_pure = true;
             }
+            /*fn walk_credit_access_predicate(      TODO: needed?
+                &mut self,
+                _name: &str,
+                _args: &Vec<Expr>,
+                _perm_amount: &FracPermAmount,
+                _pos: &Position
+            ) {
+                self.non_pure = true;
+            }*/
         }
         let mut walker = PurityFinder { non_pure: false };
         walker.walk(self);
@@ -841,6 +864,7 @@ impl Expr {
             ) -> Expr {
                 true.into()
             }
+            //TODO: need to add credit_access_predicate?
         }
         Purifier.fold(self)
     }
@@ -913,6 +937,7 @@ impl Expr {
             ) {
                 self.non_pure = true;
             }
+            //TODO: need to add credit access predicate?
         }
         let mut walker = HeapAccessFinder { non_pure: false };
         walker.walk(self);
@@ -1072,6 +1097,7 @@ impl Expr {
             }
             Expr::MagicWand(..) |
             Expr::PredicateAccessPredicate(..) |
+            Expr::CreditAccessPredicate(..) |       //TODO: correct?
             Expr::FieldAccessPredicate(..) |
             Expr::InhaleExhale(..) => {
                 unreachable!("Unexpected expression: {:?}", self);
@@ -1419,6 +1445,7 @@ impl Expr {
             fn fold(&mut self, e: Expr) -> Expr {
                 match e {
                     f @ Expr::PredicateAccessPredicate(..) => f,
+                    f @ Expr::CreditAccessPredicate(..) => f,
                     f @ Expr::FieldAccessPredicate(..) => f,
                     Expr::BinOp(BinOpKind::And, y, z, p) => {
                         self.fold_bin_op(BinOpKind::And, y, z, p)
@@ -1587,6 +1614,10 @@ impl PartialEq for Expr {
                 Expr::PredicateAccessPredicate(ref other_name, ref other_arg, other_perm, _),
             ) => (self_name, self_arg, self_perm) == (other_name, other_arg, other_perm),
             (
+                Expr::CreditAccessPredicate(ref self_name, ref self_args, self_perm, _),
+                Expr::CreditAccessPredicate(ref other_name, ref other_args, other_perm, _),
+            ) => (self_name, self_args, self_perm) == (other_name, other_args, other_perm),
+            (
                 Expr::FieldAccessPredicate(box ref self_base, self_perm, _),
                 Expr::FieldAccessPredicate(box ref other_base, other_perm, _),
             ) => (self_base, self_perm) == (other_base, other_perm),
@@ -1664,6 +1695,7 @@ impl Hash for Expr {
             Expr::PredicateAccessPredicate(ref name, ref arg, perm, _) => {
                 (name, arg, perm).hash(state)
             }
+            Expr::CreditAccessPredicate(ref name, ref args, frac_perm, _) => (name, args, frac_perm).hash(state),
             Expr::FieldAccessPredicate(box ref base, perm, _) => (base, perm).hash(state),
             Expr::UnaryOp(op, box ref arg, _) => (op, arg).hash(state),
             Expr::BinOp(op, box ref left, box ref right, _) => (op, left, right).hash(state),

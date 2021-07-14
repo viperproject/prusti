@@ -151,6 +151,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> PureFunctionEncoder<'p, 'v, 'tcx> {
             &encoded_args,
             None,
             true,
+            false,              // could be inhaled
             None,
             ErrorCtxt::GenericExpression)?;
 
@@ -318,6 +319,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> PureFunctionEncoder<'p, 'v, 'tcx> {
                 &encoded_args,
                 None,
                 true,
+                false,                  // could be inhaled
                 None,
                 ErrorCtxt::GenericExpression,
             )?);
@@ -353,6 +355,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> PureFunctionEncoder<'p, 'v, 'tcx> {
                 &encoded_args,
                 Some(&encoded_return.clone().into()),
                 true,
+                false,              // could be inhaled
                 None,
                 ErrorCtxt::GenericExpression,
             )?;

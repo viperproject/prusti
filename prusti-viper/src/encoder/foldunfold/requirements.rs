@@ -256,6 +256,8 @@ impl RequiredPermissionsGetter for vir::Expr {
                 result
             }
 
+            vir::Expr::CreditAccessPredicate(_, _args, _frac_perm_amount, _) => HashSet::new(),     //TODO ?
+
             vir::Expr::FieldAccessPredicate(expr, _perm_amount, _) => expr
                 .get_required_permissions(predicates, old_exprs)
                 .into_iter()

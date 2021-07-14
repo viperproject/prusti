@@ -7,12 +7,14 @@
 use crate::vir::ast::*;
 use std::fmt;
 use std::collections::HashSet;
+use itertools::Itertools;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Predicate {
     Struct(StructPredicate),
     Enum(EnumPredicate),
     Bodyless(String, LocalVar),
+    CreditUnit(CreditUnitPredicate),
 }
 
 impl fmt::Display for Predicate {
@@ -21,6 +23,7 @@ impl fmt::Display for Predicate {
             Predicate::Struct(p) => write!(f, "{}", p),
             Predicate::Enum(p) => write!(f, "{}", p),
             Predicate::Bodyless(name, this) => write!(f, "bodyless_predicate {}({});", name, this),
+            Predicate::CreditUnit(p) => write!(f, "{}", p),
         }
     }
 }
@@ -43,6 +46,7 @@ impl Predicate {
     pub fn is_abstract(&self) -> bool {
         match self {
             Predicate::Struct(StructPredicate { body: None, .. }) => true,
+            Predicate::CreditUnit(CreditUnitPredicate { body: None, .. }) => true,      //TODO:?
             _ => false,
         }
     }
@@ -95,12 +99,20 @@ impl Predicate {
             variants,
         })
     }
+    pub fn new_credit_unit(name: String, args: Vec<LocalVar>, body: Option<Expr>) -> Predicate {
+        Predicate::CreditUnit(CreditUnitPredicate {
+            name,
+            args,
+            body
+        })
+    }
     /// A `self` place getter.
     pub fn self_place(&self) -> Expr {
         match self {
             Predicate::Struct(p) => p.this.clone().into(),
             Predicate::Enum(p) => p.this.clone().into(),
             Predicate::Bodyless(_, this) => this.clone().into(),
+            Predicate::CreditUnit(_) => unimplemented!("The self argument is not defined for CreditUnit predicates like: {:?}", self),
         }
     }
     /// The predicate name getter.
@@ -109,6 +121,7 @@ impl Predicate {
             Predicate::Struct(p) => &p.name,
             Predicate::Enum(p) => &p.name,
             Predicate::Bodyless(ref name, _) => name,
+            Predicate::CreditUnit(p) => &p.name,
         }
     }
 }
@@ -119,6 +132,7 @@ impl WithIdentifier for Predicate {
             Predicate::Struct(p) => p.get_identifier(),
             Predicate::Enum(p) => p.get_identifier(),
             Predicate::Bodyless(name, _) => name.clone(),
+            Predicate::CreditUnit(p) => p.get_identifier(),
         }
     }
 }
@@ -272,6 +286,38 @@ impl EnumPredicate {
 }
 
 impl WithIdentifier for EnumPredicate {
+    fn get_identifier(&self) -> String {
+        self.name.clone()
+    }
+}
+
+/// A predicate with multiple (0 or more) arguments
+/// for example used to encode resource credits
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct CreditUnitPredicate {
+    /// The predicate name in Viper.
+    pub name: String,
+    /// The arguments
+    pub args: Vec<LocalVar>,
+    /// The optional body of the predicate.
+    pub body: Option<Expr>,
+}
+
+impl fmt::Display for CreditUnitPredicate {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "multi_arg_predicate {}({}", self.name, self.args.iter().format(", "))?;
+        match self.body {
+            None => writeln!(f, ");"),
+            Some(ref body) => {
+                writeln!(f, "){{")?;
+                writeln!(f, "  {}", body)?;
+                writeln!(f, "}}")
+            }
+        }
+    }
+}
+
+impl WithIdentifier for CreditUnitPredicate {
     fn get_identifier(&self) -> String {
         self.name.clone()
     }

@@ -27,6 +27,10 @@ pub type AssertionKind = common::AssertionKind<ExpressionId, syn::Expr, Arg>;
 pub type Expression = common::Expression<ExpressionId, syn::Expr>;
 /// A trigger set that has not types associated with it.
 pub type TriggerSet = common::TriggerSet<ExpressionId, syn::Expr>;
+/// A credit polynomial term that has expression ids but no types associated with it
+pub type CreditPolynomialTerm = common::CreditPolynomialTerm<ExpressionId, syn::Expr, Arg>;
+/// A credit power that has expression ids but no types associated with it
+pub type CreditVarPower = common::CreditVarPower<ExpressionId, Arg>;
 /// A pledge that has not types associated with it.
 pub type Pledge = common::Pledge<ExpressionId, syn::Expr, Arg>;
 
@@ -253,6 +257,36 @@ impl AssignExpressionId<TriggerSet> for common::TriggerSet<(), syn::Expr> {
     }
 }
 
+impl AssignExpressionId<CreditVarPower> for common::CreditVarPower<(), Arg> {
+    fn assign_id(
+        self,
+        spec_id: SpecificationId,
+        id_generator: &mut ExpressionIdGenerator,
+    ) -> CreditVarPower {
+        CreditVarPower {
+            spec_id,
+            id: id_generator.generate(),
+            var: self.var,
+            exponent: self.exponent,
+        }
+    }
+}
+
+impl AssignExpressionId<CreditPolynomialTerm> for common::CreditPolynomialTerm<(), syn::Expr, Arg> {
+    fn assign_id(
+        self,
+        spec_id: SpecificationId,
+        id_generator: &mut ExpressionIdGenerator,
+    ) -> CreditPolynomialTerm {
+        CreditPolynomialTerm {
+            coeff_expr: self.coeff_expr.assign_id(spec_id, id_generator),
+            powers: self.powers.into_iter()
+                .map(|pow| pow.assign_id(spec_id, id_generator))
+                .collect()
+        }
+    }
+}
+
 
 impl AssignExpressionId<AssertionKind> for common::AssertionKind<(), syn::Expr, Arg> {
     fn assign_id(
@@ -288,6 +322,17 @@ impl AssignExpressionId<AssertionKind> for common::AssertionKind<(), syn::Expr, 
                      .map(|assertion|
                          Assertion { kind: assertion.kind.assign_id(spec_id, id_generator) })
                      .collect(),
+            },
+            CreditPolynomial {credit_type, concrete_terms, abstract_terms, ..} => CreditPolynomial {
+                spec_id,
+                id: id_generator.generate(),
+                credit_type,
+                concrete_terms: concrete_terms.into_iter()
+                    .map(|term| term.assign_id(spec_id, id_generator))
+                    .collect(),
+                abstract_terms: abstract_terms.into_iter()
+                    .map(|term| term.assign_id(spec_id, id_generator))
+                    .collect(),
             },
             x => unimplemented!("{:?}", x),
         }
@@ -351,6 +396,43 @@ impl EncodeTypeCheck for TriggerSet {
                 };
                 tokens.extend(typeck_call);
             }
+        }
+    }
+}
+
+impl EncodeTypeCheck for CreditVarPower {
+    fn encode_type_check(&self, tokens: &mut TokenStream) {
+        // check type of variable
+        let span = self.var.name.span();
+        let expr = &self.var.name;
+        let identifier = format!("{}_{}", self.spec_id, self.id);
+        let var_typeck_call = quote_spanned! { span =>
+            #[prusti::spec_only]
+            #[prusti::expr_id = #identifier]
+            || -> u32 {             //TODO: allow other types and check nonnegativity somewhere else
+                #expr
+            };
+        };
+        tokens.extend(var_typeck_call);
+    }
+}
+
+impl EncodeTypeCheck for CreditPolynomialTerm {
+    fn encode_type_check(&self, tokens: &mut TokenStream) {
+        let span = self.coeff_expr.expr.span();
+        let coeff_expr = &self.coeff_expr.expr;
+        let identifier = format!("{}_{}", self.coeff_expr.spec_id, self.coeff_expr.id);
+        let coeff_typeck_call = quote_spanned! { span =>
+            #[prusti::spec_only]
+            #[prusti::expr_id = #identifier]
+            || -> u32 {
+                #coeff_expr
+            };
+        };
+        tokens.extend(coeff_typeck_call);
+
+        for pow in self.powers.iter() {
+            pow.encode_type_check(tokens);
         }
     }
 }
@@ -441,6 +523,27 @@ impl EncodeTypeCheck for Assertion {
                     #[prusti::expr_id = #post_id]
                     |#(#vec_of_args_with_result),*| {
                         #post_assertion
+                    };
+                };
+                tokens.extend(typeck_call);
+            }
+            AssertionKind::CreditPolynomial {spec_id, id, concrete_terms, abstract_terms, ..} =>{
+                let span = Span::call_site();
+                let mut terms_typeck = TokenStream::new();
+                for term in concrete_terms.iter() {
+                    term.encode_type_check(&mut terms_typeck);
+                }
+                for term in abstract_terms.iter() {
+                    term.encode_type_check(&mut terms_typeck);
+                }
+
+
+                let identifier = format!("{}_{}", spec_id, id);
+                let typeck_call = quote_spanned! {span=>
+                    #[prusti::spec_only]
+                    #[prusti::expr_id = #identifier]
+                    || {
+                        #terms_typeck
                     };
                 };
                 tokens.extend(typeck_call);

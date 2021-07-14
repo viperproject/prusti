@@ -112,6 +112,8 @@ impl ExprFootprintGetter for vir::Expr {
                 opt_perm.into_iter().collect()
             }
 
+            vir::Expr::CreditAccessPredicate(_, _args, _frac_perm_amount, _) => HashSet::new(),       //TODO: ?
+
             vir::Expr::FieldAccessPredicate(box ref place, perm_amount, _) => {
                 // In Prusti we assume to have only places here
                 debug_assert!(place.is_place());
@@ -158,7 +160,7 @@ impl PredicateFootprintGetter for vir::Predicate {
         &self,
         maybe_variant: &vir::MaybeEnumVariantIndex,
     ) -> HashSet<Perm> {
-        let perms = match self {
+        match self {
             vir::Predicate::Struct(p) => {
                 assert!(maybe_variant.is_none());
                 p.get_body_footprint()
@@ -177,8 +179,8 @@ impl PredicateFootprintGetter for vir::Predicate {
                 }
             }
             vir::Predicate::Bodyless(_, _) => HashSet::new(),
-        };
-        perms
+            vir::Predicate::CreditUnit(_p) => HashSet::new(),       //TODO: ?
+        }
     }
 }
 

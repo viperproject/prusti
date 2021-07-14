@@ -13,6 +13,8 @@ use std::{
     ops,
 };
 
+use crate::vir::Expr;
+
 pub trait WithIdentifier {
     fn get_identifier(&self) -> String;
 }
@@ -133,6 +135,28 @@ impl Ord for PermAmount {
             "Undefined comparison between {:?} and {:?}",
             self, other
         ))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct FracPermAmount(pub Box<Expr>, pub Box<Expr>);
+
+impl FracPermAmount {
+    /// Construct a new fractional permission amount `left/right`
+    pub fn new(left: Box<Expr>, right: Box<Expr>) -> FracPermAmount {
+        FracPermAmount(left, right)
+    }       //TODO: may need to add brackets
+    pub fn left(&self) -> &Expr {
+        &self.0
+    }
+    pub fn right(&self) -> &Expr {
+        &self.1
+    }
+}
+
+impl fmt::Display for FracPermAmount {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}/{}", self.left(), self.right())
     }
 }
 

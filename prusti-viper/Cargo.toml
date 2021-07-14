@@ -13,6 +13,7 @@ doctest = false # we have no doc tests
 [dependencies]
 log = { version = "0.4", features = ["release_max_level_info"] }
 viper = { path = "../viper" }
+itertools = "0.10.0"
 prusti-specs = { path = "../prusti-specs" }
 prusti-interface = { path = "../prusti-interface" }
 prusti-common = { path = "../prusti-common" }

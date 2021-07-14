@@ -294,6 +294,11 @@ impl<'tcx> ErrorManager<'tcx>
                     .set_failing_assertion(opt_cause_span)
             }
 
+            ("exhale.failed:assertion.false", ErrorCtxt::ExhaleMethodPrecondition) => {     //TODO: different error for failing exhale of type predicates?
+                PrustiError::verification("precondition might not hold.", error_span)
+                    .set_failing_assertion(opt_cause_span)
+            }
+
             ("fold.failed:assertion.false", ErrorCtxt::ExhaleMethodPrecondition) => {
                 PrustiError::verification(
                     "implicit type invariant expected by the function call might not hold.",

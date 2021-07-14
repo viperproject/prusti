@@ -19,6 +19,13 @@ pub enum AssertionKind {
         pres: Vec<Assertion>,
         posts: Vec<Assertion>,
     },
+    CreditPolynomial {
+        spec_id: untyped::SpecificationId,
+        expr_id: untyped::ExpressionId,
+        credit_type: String,
+        concrete_terms: Vec<CreditPolynomialTerm>,
+        abstract_terms: Vec<CreditPolynomialTerm>
+    },
 }
 
 #[derive(Serialize, Deserialize)]
@@ -49,6 +56,19 @@ pub struct TriggerSet(pub Vec<Trigger>);
 
 #[derive(Serialize, Deserialize)]
 pub struct Trigger(pub Vec<Expression>);
+
+#[derive(Serialize, Deserialize)]
+pub struct CreditVarPower {
+    pub spec_id: untyped::SpecificationId,
+    pub expr_id: untyped::ExpressionId,
+    pub exponent: u32,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct CreditPolynomialTerm {
+    pub coeff_expr: Expression,
+    pub powers: Vec<CreditVarPower>,
+}
 
 impl untyped::Expression {
     fn to_structure(&self) -> Expression {
@@ -101,6 +121,29 @@ impl common::Trigger<common::ExpressionId, syn::Expr> {
     }
 }
 
+impl untyped::CreditVarPower {
+    fn to_structure(&self) -> CreditVarPower {
+        CreditVarPower {
+            spec_id: self.spec_id,
+            expr_id: self.id,
+            exponent: self.exponent,
+        }
+    }
+}
+
+impl untyped::CreditPolynomialTerm {
+    fn to_structure(&self) -> CreditPolynomialTerm {
+        CreditPolynomialTerm {
+            coeff_expr: self.coeff_expr.to_structure(),
+            powers: self.powers
+                .clone()
+                .into_iter()
+                .map(|x| x.to_structure())
+                .collect(),
+        }
+    }
+}
+
 impl untyped::AssertionKind {
     fn to_structure(&self) -> AssertionKind {
         use super::common::AssertionKind::*;
@@ -127,6 +170,13 @@ impl untyped::AssertionKind {
                 arg_binders: arg_binders.to_structure(),
                 pres: pres.iter().map(|pre| pre.to_structure()).collect(),
                 posts: posts.iter().map(|post| post.to_structure()).collect(),
+            },
+            CreditPolynomial {spec_id, id, credit_type, concrete_terms, abstract_terms } => AssertionKind::CreditPolynomial {
+                spec_id: *spec_id,
+                expr_id: *id,
+                credit_type: credit_type.clone(),
+                concrete_terms: concrete_terms.iter().map(|term| term.to_structure()).collect(),
+                abstract_terms: abstract_terms.iter().map(|term| term.to_structure()).collect()
             },
             x => {
                 unimplemented!("{:?}", x);

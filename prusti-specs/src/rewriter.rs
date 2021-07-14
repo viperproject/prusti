@@ -1,9 +1,11 @@
-use crate::specifications::common::{ExpressionIdGenerator, SpecificationIdGenerator};
+use crate::specifications::common::{ExpressionIdGenerator, SpecificationIdGenerator, AssertionFolder, ExpressionId, SpecificationId};
 use crate::specifications::untyped::{self, EncodeTypeCheck};
 use proc_macro2::{Span, TokenStream};
 use quote::{quote_spanned, format_ident};
 use syn::spanned::Spanned;
 use syn::{Type, punctuated::Punctuated, Pat, Token};
+use crate::specifications::preparser::Arg;
+use crate::{generate_spec_and_assertions, extract_prusti_attributes};
 
 pub(crate) struct AstRewriter {
     expr_id_generator: ExpressionIdGenerator,
@@ -91,6 +93,112 @@ impl AstRewriter {
             }
         );
         fn_arg
+    }
+
+    pub fn generate_abstract_coefficients(&self, assertion: &mut untyped::Assertion, fn_item: &untyped::AnyFnItem)
+        -> Vec<syn::Item>
+    {
+        struct CreditFolder {
+            name_prefix: String,            // needs to be different for different fn_items
+            added_coeffs: Vec<String>,
+        }
+        impl AssertionFolder<ExpressionId, syn::Expr, Arg> for CreditFolder {
+            fn fold_credit_polynomial(
+                &mut self,
+                spec_id: SpecificationId,
+                id: ExpressionId,
+                credit_type: String,
+                concrete_terms: Vec<untyped::CreditPolynomialTerm>,
+                mut abstract_terms: Vec<untyped::CreditPolynomialTerm>,
+            ) -> untyped::AssertionKind {
+
+                if let syn::Expr::Lit(lit) = &abstract_terms.first().unwrap().coeff_expr.expr {
+                    let user_id = if let syn::Lit::Int(lit_int) = &lit.lit {
+                        lit_int.to_string()
+                    }
+                    else if let syn::Lit::Str(lit_str) = &lit.lit {
+                        lit_str.value()
+                    }
+                    else {
+                        unimplemented!()
+                    };
+
+                    let mut credit_vec = credit_type.split("_").collect::<Vec<&str>>();
+                    credit_vec.remove(credit_vec.len()-1);      // remove "_credits"
+                    let credit_name = credit_vec.join("_");
+
+                    // add function call as abstract coefficient expression
+                    for term in abstract_terms.iter_mut() {
+                        // construct name of coefficient
+                        let mut powers_str = term.powers.iter()  // powers are ordered by var name
+                            .map(|pow| format!("{}{}", pow.var.name, pow.exponent))
+                            .collect::<Vec<String>>().concat();
+                        if powers_str.is_empty() {
+                            powers_str = "0".to_string();
+                        }
+                        let coeff_name = format!("{}_{}_{}_{}", self.name_prefix, credit_name, user_id, powers_str);
+
+                        let call_str = format!("{}()", coeff_name);
+                        let coeff_expr: syn::Expr = syn::parse_str(&call_str)
+                            .expect("Unexpected error while parsing abstract coefficient function call");             //TODO: proper error? -> handle_result?
+                        term.coeff_expr.expr = coeff_expr;
+
+                        self.added_coeffs.push(coeff_name);
+                    }
+
+
+                    untyped::AssertionKind::CreditPolynomial {
+                        spec_id,
+                        id,
+                        credit_type,
+                        concrete_terms,
+                        abstract_terms
+                    }
+                }
+                else {
+                    unimplemented!()
+                }
+            }
+        }
+
+
+        let mut folder = CreditFolder {
+            name_prefix: fn_item.sig().ident.to_string(),
+            added_coeffs: vec![]
+        };
+        *assertion = folder.fold_assertion(assertion.clone());
+
+        // generate & return functions for coefficients
+        let mut generated_fns = vec![];
+        for coeff_name in folder.added_coeffs {
+            let coeff_ident = syn::Ident::new(&coeff_name, fn_item.span());      //TODO: correct span
+            //TODO: ensures necessary if use u32?
+            //TODO: span correct?
+            //TODO: better avoid parsing twice?
+            let coeff_fn: syn::ItemFn = parse_quote_spanned! {fn_item.span()=>
+                #[allow(unused_must_use, unused_variables, dead_code, unused_comparisons)]
+                #[pure]
+                #[trusted]
+                #[ensures(result >= 0)]
+                fn #coeff_ident() -> u32 {
+                    unimplemented!()
+                }
+            };
+            let mut coeff_any_fn = untyped::AnyFnItem::Fn(coeff_fn);
+            let attributes_vec = extract_prusti_attributes(&mut coeff_any_fn).collect();
+            let (generated_spec_items, generated_attributes) =
+                generate_spec_and_assertions(attributes_vec, &coeff_any_fn)
+                    .expect("Internal error while creating abstract coefficient function");     //TODO: better error?
+
+            let rewritten_coeff_fn: syn::Item = parse_quote_spanned! {coeff_any_fn.span()=>
+                #(#generated_attributes)*
+                #coeff_any_fn
+            };
+            generated_fns.push(rewritten_coeff_fn);
+            generated_fns.extend(generated_spec_items);
+        }
+
+        generated_fns
     }
 
     /// Generate a dummy function for checking the given precondition, postcondition or predicate.
