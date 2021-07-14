@@ -96,6 +96,8 @@ pub struct ProcedureEncoder<'p, 'v: 'p, 'tcx: 'v> {
     array_magic_wand_at: HashMap<mir::Location, (vir::Expr, vir::Expr, vir::Expr)>,
     /// Labels for array equalities in loops
     array_loop_old_label: HashMap<BasicBlockIndex, String>,
+    /// Slices created at certain locations
+    slice_created_at: HashMap<mir::Location, vir::Expr>,
     // /// Contracts of functions called at given locations with map for replacing fake expressions.
     procedure_contracts:
         HashMap<mir::Location, (ProcedureContract<'tcx>, HashMap<vir::Expr, vir::Expr>)>,
@@ -159,6 +161,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             magic_wand_at_location: HashMap::new(),
             array_magic_wand_at: HashMap::new(),
             array_loop_old_label: HashMap::new(),
+            slice_created_at: HashMap::new(),
             procedure_contracts: HashMap::new(),
             pure_var_for_preserving_value_map: HashMap::new(),
             init_info,
@@ -1546,13 +1549,21 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                         is_in_package_stmt,
                     )?,
                 ReborrowingKind::Call { loan, .. } => {
-                    self.construct_vir_reborrowing_node_for_call(
-                        &mir_dag,
-                        loan,
-                        node,
-                        location,
-                        is_in_package_stmt
-                    )?
+                    if let Some(slice_expiry_node) = self.construct_vir_reborrowing_node_for_slice(
+                            loan,
+                            node,
+                            location,
+                        )? {
+                        slice_expiry_node
+                    } else {
+                        self.construct_vir_reborrowing_node_for_call(
+                            &mir_dag,
+                            loan,
+                            node,
+                            location,
+                            is_in_package_stmt
+                        )?
+                    }
                 }
                 ReborrowingKind::ArgumentMove { loan } => {
                     let loan_location = self.polonius_info().get_loan_location(&loan);
@@ -1584,6 +1595,50 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         let bbi = &location.block;
         let executed_flag_var = self.cfg_block_has_been_executed[bbi].clone();
         vir::Expr::local(executed_flag_var).into()
+    }
+
+    // will return None if not a slice borrow
+    // as slicing is just a function call, we can only tell the difference upon
+    // closer inspection
+    fn construct_vir_reborrowing_node_for_slice(
+        &mut self,
+        loan: facts::Loan,
+        node: &ReborrowingDAGNode,
+        location: mir::Location,
+    ) -> SpannedEncodingResult<Option<vir::borrows::Node>> {
+        let span = self.mir_encoder.get_span_of_location(location);
+
+        let loan_location = self.polonius_info().get_loan_location(&loan);
+        trace!("loan_location: {:?}", loan_location);
+
+        let loan_places = self.polonius_info().get_loan_places(&loan)
+            .map_err(EncodingError::from)
+            .with_span(span)?;
+        trace!("loan_places: {:?}", loan_places);
+        trace!("node: {:?}", node);
+
+        Ok(if let Some(regained) = self.slice_created_at.get(&loan_location) {
+            let guard = self.construct_location_guard(loan_location);
+            trace!("guard: {:?}", guard);
+            trace!("regained: {:?}", regained);
+            Some(
+                vir::borrows::Node::new(
+                    guard,
+                    node.loan.into(),
+                    convert_loans_to_borrows(&node.reborrowing_loans),
+                    convert_loans_to_borrows(&node.reborrowed_loans),
+                    vec![
+                        vir::Stmt::comment("hi"),
+                    ],
+                    vec![regained.clone()],
+                    Vec::new(),
+                    Vec::new(),
+                    None,
+                )
+            )
+        } else {
+            None
+        })
     }
 
     fn construct_vir_reborrowing_node_for_assignment(
@@ -2230,6 +2285,19 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                             ));
                         }
 
+                        "core::ops::Index::index" |
+                        "std::ops::Index::index" => {
+                            debug!("Encoding call of array/slice index call");
+                            stmts.extend(
+                                self.encode_sequence_index_call(
+                                    destination,
+                                    args,
+                                    location,
+                                    span,
+                                )?
+                            );
+                        }
+
                         _ => {
                             let is_pure_function = self.encoder.is_pure(def_id);
                             if is_pure_function {
@@ -2395,8 +2463,179 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         debug!(
             "Pure function call location {:?} has label {}",
             location, label
-            );
+        );
         self.label_after_location.insert(location, label);
+
+        Ok(stmts)
+    }
+
+    fn encode_sequence_index_call(
+        &mut self,
+        destination: &Option<(mir::Place<'tcx>, BasicBlockIndex)>,
+        args: &[mir::Operand<'tcx>],
+        location: mir::Location,
+        span: Span,
+    ) -> SpannedEncodingResult<Vec<vir::Stmt>> {
+        trace!("encode_sequence_index_call(destination={:?}, args={:?})", destination, args);
+        // args[0] is the base array/slice, args[1] is the index
+        // index is not specified exactly, as std::ops::Index::index is a trait method, so all we
+        // know is there needs to be an impl Index<Idx> for T
+        assert!(args.len() == 2, "unexpected args to sequence index call: {:?}", args);
+
+        let mut stmts = vec![];
+
+        // we need to put a label before, it seems..
+        let label = self.cfg_method.get_fresh_label_name();
+        stmts.push(vir::Stmt::Label(label.clone()));
+
+        let (encoded_lhs, encode_stmts, lhs_ty, _) = self.encode_place(
+            &destination.as_ref().unwrap().0,
+            ArrayAccessKind::Mutable(None, location),
+        ).with_span(span)?;
+        stmts.extend(encode_stmts);
+        assert!(lhs_ty.is_slice(), "non-slice LHS type '{:?}' not supported yet", lhs_ty);
+
+        stmts.extend(self.encode_havoc(&encoded_lhs));
+        stmts.push(vir!{ inhale [vir::Expr::pred_permission(encoded_lhs.clone(), vir::PermAmount::Read).unwrap()] });
+
+        let lhs_slice_ty = lhs_ty.peel_refs();
+        let lhs_slice_expr = self.encoder.encode_value_expr(encoded_lhs.clone(), lhs_ty).with_span(span)?;
+
+        let base_seq = self.mir_encoder.encode_operand_place(&args[0]).with_span(span)?.unwrap();
+        let base_seq_ty = self.mir_encoder.get_operand_ty(&args[0]);
+        assert!(base_seq_ty.peel_refs().is_array() || base_seq_ty.is_slice(),
+            "slicing is only supported for arrays/slices currently, not {:?}",
+            base_seq_ty);
+
+        // base_seq is expected to be ref$Array$.. or ref$Slice$.., but lookup_pure wants the
+        // contained Array$../Slice$..
+        let base_seq_expr = self.encoder.encode_value_expr(base_seq, base_seq_ty).with_span(span)?;
+
+        let encoded_idx = self.mir_encoder.encode_operand_place(&args[1]).with_span(span)?.unwrap();
+        trace!("idx: {:?}", encoded_idx);
+        let idx_ty = self.mir_encoder.get_operand_ty(&args[1]);
+        let idx_ident = self.encoder.env().tcx().def_path_str(idx_ty.ty_adt_def().unwrap().did);
+        trace!("ident: {}", idx_ident);
+
+        self.slice_created_at.insert(location, encoded_lhs);
+
+        // TODO: what do we actually do here? this seems a littly hacky.
+        let (start, end) = match &*idx_ident {
+            "std::ops::Range" => {
+                // there's fields like _5.f$start.val_int on `encoded_idx`, it just feels hacky to
+                // manually re-do them here when we probably just encoded the type and the
+                // construction of the fields..
+                let usize_ty = self.encoder.env().tcx().mk_ty(ty::TyKind::Uint(ty::UintTy::Usize));
+                let start = encoded_idx.clone()
+                    .field(self.encoder.encode_struct_field("start", usize_ty).with_span(span)?);
+                let start_expr = self.encoder.encode_value_expr(start, usize_ty).with_span(span)?;
+
+                let end = encoded_idx
+                    .field(self.encoder.encode_struct_field("end", usize_ty).with_span(span)?);
+                let end_expr = self.encoder.encode_value_expr(end, usize_ty).with_span(span)?;
+
+                (start_expr, end_expr)
+            },
+            // other things like RangeFull, RangeFrom, RangeTo, RangeInclusive could be added here
+            // relatively easily
+            _ => todo!("{}", idx_ident),
+        };
+
+        trace!("start: {}, end: {}", start, end);
+
+
+        let j = vir_local!{ j: Int };
+        let j_var: vir::Expr = j.clone().into();
+        let rhs_lookup_j = match base_seq_ty.peel_refs() {
+            a if a.is_array() => {
+                let array_types = self.encoder.encode_array_types(a).with_span(span)?;
+                let elem_snap_ty = self.encoder.encode_snapshot_type(array_types.elem_ty_rs)
+                    .with_span(span)?;
+                array_types.encode_lookup_pure_call(
+                    self.encoder,
+                    base_seq_expr,
+                    vir::Expr::from(j),
+                    elem_snap_ty,
+                )
+            }
+            // ty::is_slice() expects a Ref(Slice(..)) but we already peeled refs (and
+            // encode_slice_types expects no ref either)
+            s if matches!(s.kind(), ty::TyKind::Slice(..)) => {
+                let slice_types = self.encoder.encode_slice_types(s).with_span(span)?;
+                let elem_snap_ty = self.encoder.encode_snapshot_type(slice_types.elem_ty_rs)
+                    .with_span(span)?;
+                slice_types.encode_lookup_pure_call(
+                    self.encoder,
+                    base_seq_expr,
+                    vir::Expr::from(j),
+                    elem_snap_ty,
+                )
+            }
+            _ => unreachable!(),  // checked the type above already
+        };
+
+        let slice_types_lhs = self.encoder.encode_slice_types(lhs_slice_ty).with_span(span)?;
+        let elem_snap_ty = self.encoder.encode_snapshot_type(slice_types_lhs.elem_ty_rs)
+            .with_span(span)?;
+
+        // length
+        let length = vir!{ [end] - [start] };
+        let slice_len_call = slice_types_lhs.encode_slice_len_call(self.encoder, lhs_slice_expr.clone());
+        stmts.push(vir!{
+            inhale [vir!{ [slice_len_call] == [length] }]
+        });
+
+        // lookup_pure: contents
+        let i = vir_local!{ i: Int };
+        let i_var: vir::Expr = i.clone().into();
+
+        let lhs_lookup_i = {
+            slice_types_lhs.encode_lookup_pure_call(
+                self.encoder,
+                lhs_slice_expr,
+                vir::Expr::from(i),
+                elem_snap_ty,
+            )
+        };
+
+        // NOTE: the lhs_ and rhs_ here refer to the moment the slice is created, so lhs_lookup is
+        // lookup on the slice currently being created, and rhs_lookup is on the array or slice
+        // being sliced
+        let lookup_eq = vir!{ [lhs_lookup_i] == [rhs_lookup_j] };
+        let indices = vir!{
+            [vir!{ [vir::Expr::from(0)] <= [i_var] }] &&
+            (
+                [vir!{ [i_var] < [slice_len_call] }] &&
+                (
+                    [vir!{ [j_var] == [vir!{ [i_var] + [start] }] }] &&
+                    (
+                        [vir!{ [start] <= [j_var] }] &&
+                        [vir!{ [j_var] < [end] }]
+                    )
+                )
+            )
+        };
+
+        // TODO: maybe don't bother with a complicated forall if the array length is less than some
+        // reasonable bound
+        stmts.push(vir!{
+            inhale [vir!{ forall i: Int, j: Int :: {} ([indices] ==> [lookup_eq]) }]
+        });
+
+        self.encode_transfer_args_permissions(location, args,  &mut stmts, label.clone(), false)?;
+        // Store a label for permissions got back from the call
+        debug!(
+            "Pure function call location {:?} has label {}",
+            location, label
+        );
+        self.label_after_location.insert(location, label);
+
+        // plan
+        //
+        // [x] inhale Array$lookup_pure == Slice$lookup_pure with quantifier from start to end
+        // [?] label, encode_transfer_permissions?
+        // [ ] look at the other range types (at least those from the stdlib?
+        // [ ] what if the index is not a range? should support Index<usize> for arrays and slices maybe, mostly implemented anyway i guess
 
         Ok(stmts)
     }
