@@ -152,13 +152,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     info!("Read lists of crates...");
     // TODO: do something to freeze the version of the dependencies.
     let crates_list: Vec<Crate> = csv::Reader::from_reader(
-       fs::File::open("test-crates/crates.csv")?
+       fs::File::open("test-crates/no_panic.csv")?
     ).deserialize()
         .collect::<Result<Vec<CrateRecord>, _>>()?
         .into_iter()
         .map(|c| c.into())
         // For the moment, test only a few of the crates.
-        .take(2)
+        .take(500)
         .collect();
 
     // List of crates that don't compile with the standard compiler.

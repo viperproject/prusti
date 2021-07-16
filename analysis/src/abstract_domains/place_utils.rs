@@ -113,6 +113,9 @@ pub(crate) fn expand_one_level<'tcx>(
         mir::ProjectionElem::Deref => {
             (tcx.mk_place_deref(current_place), Vec::new())
         }
+        mir::ProjectionElem::Index(idx) => {
+            (tcx.mk_place_index(current_place, idx), Vec::new())
+        }
         elem => {
             unimplemented!("elem = {:?}", elem);
         }
