@@ -5,10 +5,9 @@ use std::collections::VecDeque;
 use syn::parse::{ParseStream, Parse};
 use syn::Token;
 use syn::spanned::Spanned;
-use quote::quote;
 
 use super::common;
-use crate::specifications::common::{QuantifierVars, SpecEntailmentVars, TriggerSet, Trigger};
+use crate::rewriter;
 
 pub type AssertionWithoutId = common::Assertion<(), syn::Expr, Arg>;
 pub type PledgeWithoutId = common::Pledge<(), syn::Expr, Arg>;
@@ -88,12 +87,37 @@ impl Parser {
             source_span: self.last_span,
         }
     }
-    /// Creates a single Prusti assertion from the input and returns it.
+    /// Stubs to maintain existing public API
     pub fn extract_assertion(&mut self) -> syn::Result<AssertionWithoutId> {
+        Ok(AssertionWithoutId {
+            kind: Box::new(common::AssertionKind::And(vec![]))
+        })
+    }
+    pub fn extract_pledge(&mut self) -> syn::Result<PledgeWithoutId> {
+        Ok(PledgeWithoutId {
+            reference: None,
+            lhs: Some(AssertionWithoutId {
+                        kind: Box::new(common::AssertionKind::And(vec![]))
+                      }),
+            rhs: AssertionWithoutId {
+                    kind: Box::new(common::AssertionKind::And(vec![]))
+                 },
+        })
+    }
+    pub fn extract_pledge_rhs_only(&mut self) -> syn::Result<PledgeWithoutId> {
+        Ok(PledgeWithoutId {
+            reference: None,
+            lhs: None,
+            rhs: AssertionWithoutId {
+                    kind: Box::new(common::AssertionKind::And(vec![]))
+                 },
+        })
+    }
+
+    /// Creates a single Prusti assertion from the input and returns it.
+    pub fn extract_assertion_expr(&mut self) -> syn::Result<syn::Expr> {
         if self.tokens.is_empty() {
-            Ok(AssertionWithoutId {
-                kind: Box::new(common::AssertionKind::And(vec![]))
-            })
+            Ok(rewriter::translate_empty_assertion())
         } else {
             if let Some(span) = self.contains_both_and_or(&self.tokens) {
                 return Err(self.error_ambiguous_expression(span));
@@ -108,7 +132,7 @@ impl Parser {
         }
     }
     /// Create a pledge from the input
-    pub fn extract_pledge(&mut self) -> syn::Result<PledgeWithoutId> {
+    pub fn extract_pledge_expr(&mut self) -> syn::Result<syn::Expr> {
         let pledge = self.parse_pledge()?;
         if self.pop().is_some() {
             Err(self.error_unexpected())
@@ -117,34 +141,26 @@ impl Parser {
         }
     }
     /// Create the rhs of a pledge from the input
-    pub fn extract_pledge_rhs_only(&mut self) -> syn::Result<PledgeWithoutId> {
+    pub fn extract_pledge_rhs_only_expr(&mut self) -> syn::Result<syn::Expr> {
         let (reference, assertion) = self.parse_pledge_assertion_only()?;
         if self.pop().is_some() {
             Err(self.error_unexpected())
         } else {
-            Ok(PledgeWithoutId {
-                reference,
-                lhs: None,
-                rhs: assertion,
-            })
+            Ok(rewriter::translate_pledge_rhs_only(reference, assertion))
         }
     }
 
-    fn parse_pledge(&mut self) -> syn::Result<PledgeWithoutId> {
+    fn parse_pledge(&mut self) -> syn::Result<syn::Expr> {
         let (reference, assertion) = self.parse_pledge_assertion_only()?;
         if self.consume_operator(",") {
             let rhs = self.parse_prusti()?;
-            Ok(PledgeWithoutId {
-                reference,
-                lhs: Some(assertion),
-                rhs: rhs,
-            })
+            Ok(rewriter::translate_pledge(reference, assertion, rhs))
         } else {
             Err(self.error_expected("`,`"))
         }
     }
 
-    fn parse_pledge_assertion_only(&mut self) -> syn::Result<(Option<ExpressionWithoutId>, AssertionWithoutId)> {
+    fn parse_pledge_assertion_only(&mut self) -> syn::Result<(Option<syn::Expr>, syn::Expr)> {
         let mut reference = None;
         if self.contains_operator(&self.tokens, "=>") {
             reference = Some(self.parse_rust_until("=>")?);
@@ -157,18 +173,16 @@ impl Parser {
     }
 
     /// Parse a prusti expression
-    fn parse_prusti(&mut self) -> syn::Result<AssertionWithoutId> {
+    fn parse_prusti(&mut self) -> syn::Result<syn::Expr> {
         let lhs = self.parse_conjunction()?;
         if self.consume_operator("==>") {
             let rhs = self.parse_prusti()?;
-            Ok(AssertionWithoutId {
-                kind: Box::new(common::AssertionKind::Implies(lhs, rhs)),
-            })
+            Ok(rewriter::translate_implication(lhs, rhs))
         } else {
             Ok(lhs)
         }
     }
-    fn parse_conjunction(&mut self) -> syn::Result<AssertionWithoutId> {
+    fn parse_conjunction(&mut self) -> syn::Result<syn::Expr> {
         let mut conjuncts = vec![self.parse_entailment()?];
         while self.consume_operator("&&") {
             conjuncts.push(self.parse_entailment()?);
@@ -176,15 +190,11 @@ impl Parser {
         if conjuncts.len() == 1 {
             Ok(conjuncts.pop().unwrap())
         } else {
-            Ok(AssertionWithoutId {
-                kind: Box::new(common::AssertionKind::And(conjuncts))
-            })
+            Ok(rewriter::translate_conjunction(conjuncts))
         }
     }
-    fn parse_entailment(&mut self) -> syn::Result<AssertionWithoutId> {
-        if (self.peek_group(Delimiter::Parenthesis) && !self.is_part_of_rust_expr()) ||
-           self.peek_keyword("forall") ||
-           self.peek_keyword("exists") {
+    fn parse_entailment(&mut self) -> syn::Result<syn::Expr> {
+        if (self.peek_group(Delimiter::Parenthesis) && !self.is_part_of_rust_expr()) || self.peek_keyword("forall") {
             self.parse_primary()
         } else {
             let lhs = self.parse_rust_until(",")?;
@@ -196,7 +206,7 @@ impl Parser {
                         return Err(self.error_expected("`|`"));
                     }
                     all_args.args.into_iter()
-                                 .map(|var| Arg { typ: var.typ, name: var.name })
+                                 .map(|var| { (var.name, var.typ) })
                                  .collect()
                 } else {
                     vec![]
@@ -208,14 +218,12 @@ impl Parser {
                     Err(self.error_expected("`[`"))
                 }
             } else {
-                Ok(AssertionWithoutId {
-                    kind: Box::new(common::AssertionKind::Expr(lhs))
-                })
+                Ok(lhs)
             }
         }
     }
-    fn extract_entailment_rhs(&mut self, lhs: ExpressionWithoutId, vars: Vec<Arg>) ->
-            syn::Result<AssertionWithoutId> {
+    fn extract_entailment_rhs(&mut self, lhs: syn::Expr, vars: Vec<(syn::Ident, syn::Type)>) ->
+            syn::Result<syn::Expr> {
         let mut pres = vec![];
         let mut posts = vec![];
         let mut first = true;
@@ -224,13 +232,13 @@ impl Parser {
                 first = false;
                     if self.consume_keyword("requires") {
                         if let Some(stream) = self.consume_group(Delimiter::Parenthesis) {
-                            pres.push(self.from_token_stream_last_span(stream).extract_assertion()?);
+                            pres.push(self.from_token_stream_last_span(stream).extract_assertion_expr()?);
                         } else {
                             return Err(self.error_expected("`(`"));
                         }
                     } else if self.consume_keyword("ensures") {
                         if let Some(stream) = self.consume_group(Delimiter::Parenthesis) {
-                            posts.push(self.from_token_stream_last_span(stream).extract_assertion()?);
+                            posts.push(self.from_token_stream_last_span(stream).extract_assertion_expr()?);
                         } else {
                             return Err(self.error_expected("`(`"));
                         }
@@ -242,43 +250,23 @@ impl Parser {
             }
         }
 
-        Ok(AssertionWithoutId {
-            kind: Box::new(common::AssertionKind::SpecEntailment {
-                closure: lhs,
-                arg_binders: SpecEntailmentVars {
-                    spec_id: common::SpecificationId::dummy(),
-                    pre_id: (),
-                    post_id: (),
-                    args: vars,
-                    result: Arg { name: syn::Ident::new("result", Span::call_site()),
-                                  typ: syn::parse2(quote! { i32 }).unwrap() },
-                },
-                pres,
-                posts,
-            })
-        })
+        Ok(rewriter::translate_spec_entailment(lhs, vars, pres, posts))
     }
     /// parse a paren-delimited expression
-    fn parse_primary(&mut self) -> syn::Result<AssertionWithoutId> {
+    fn parse_primary(&mut self) -> syn::Result<syn::Expr> {
         if let Some(stream) = self.consume_group(Delimiter::Parenthesis) {
-            self.from_token_stream_last_span(stream).extract_assertion()
+            self.from_token_stream_last_span(stream).extract_assertion_expr()
         } else if self.consume_keyword("forall") {
             if let Some(stream) = self.consume_group(Delimiter::Parenthesis) {
-                self.from_token_stream_last_span(stream).extract_quantifier_rhs(false)
-            } else {
-                Err(self.error_expected("`(`"))
-            }
-        } else if self.consume_keyword("exists") {
-            if let Some(stream) = self.consume_group(Delimiter::Parenthesis) {
-                self.from_token_stream_last_span(stream).extract_quantifier_rhs(true)
+                self.from_token_stream_last_span(stream).extract_forall_rhs()
             } else {
                 Err(self.error_expected("`(`"))
             }
         } else {
-            Err(self.error_expected("`(`, `forall` or `exists`"))
+            Err(self.error_expected("`(` or `forall`"))
         }
     }
-    fn extract_quantifier_rhs(&mut self, exists: bool) -> syn::Result<AssertionWithoutId> {
+    fn extract_forall_rhs(&mut self) -> syn::Result<syn::Expr> {
         if !self.consume_operator("|") {
             return Err(self.error_expected("`|`"));
         }
@@ -290,14 +278,14 @@ impl Parser {
         if !self.consume_operator("|") {
             return Err(self.error_expected("`|`"));
         }
-        let vars: Vec<Arg> =
+        let vars: Vec<(syn::Ident, syn::Type)> =
             all_args.args.into_iter()
-                         .map(|var| Arg { typ: var.typ, name: var.name })
+                         .map(|var| { (var.name, var.typ) })
                          .collect();
 
         let body = self.parse_prusti()?;
 
-        let mut trigger_set = TriggerSet(vec![]);
+        let mut vec_of_triggers: Vec<syn::Expr> = vec![];
 
         if self.consume_operator(",") {
             if !self.consume_keyword("triggers") {
@@ -310,42 +298,19 @@ impl Parser {
             let arr: syn::ExprArray = syn::parse2(self.create_stream_remaining())
                 .map_err(|err| self.error_expected_tuple(err.span()))?;
 
-                let mut vec_of_triggers = vec![];
             for item in arr.elems {
                 if let syn::Expr::Tuple(tuple) = item {
-                    vec_of_triggers.push(
-                        Trigger(tuple.elems
-                            .into_iter()
-                            .map(|x| ExpressionWithoutId {
-                                id: (),
-                                spec_id: common::SpecificationId::dummy(),
-                                expr: x,
-                            })
-                            .collect()
-                        )
-                    );
+                    vec_of_triggers.extend(tuple.elems);
                 } else {
                     return Err(self.error_expected_tuple(item.span()));
                 }
             }
-            trigger_set = TriggerSet(vec_of_triggers);
         }
 
-        let vars = QuantifierVars {
-            spec_id: common::SpecificationId::dummy(),
-            id: (),
-            vars,
-        };
-        Ok(AssertionWithoutId {
-            kind: if exists {
-                Box::new(common::AssertionKind::Exists(vars, trigger_set, body))
-            } else {
-                Box::new(common::AssertionKind::ForAll(vars, trigger_set, body))
-            }
-        })
+        Ok(rewriter::translate_forall(vars, vec_of_triggers, body))
     }
 
-    fn parse_rust_until(&mut self, terminator: &str) -> syn::Result<ExpressionWithoutId> {
+    fn parse_rust_until(&mut self, terminator: &str) -> syn::Result<syn::Expr> {
         let mut t = vec![];
 
         while !self.peek_operator("|=") &&
@@ -364,11 +329,7 @@ impl Parser {
         } else if cloned.is_empty() {
             Err(self.error_expected("expression"))
         } else {
-            Ok(ExpressionWithoutId {
-                spec_id: common::SpecificationId::dummy(),
-                id: (),
-                expr: syn::parse2(stream)?,
-            })
+            Ok(syn::parse2(stream)?)
         }
     }
 

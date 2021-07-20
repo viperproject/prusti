@@ -1,6 +1,9 @@
+// compile-flags: -Pprint_desugared_specs=true -Pprint_typeckd_specs=true -Pno_verify=true -Phide_uuids=true
+// normalize-stdout-test: "[a-z0-9]{32}" -> "$(NUM_UUID)"
+// normalize-stdout-test: "[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}" -> "$(UUID)"
+
 use prusti_contracts::*;
 
-// ignore-test: re-entry not yet implemented
 #[ensures(
     match result {
         Ok(x) => (forall(|i: usize| i < s.len() ==> is_digit(s[i]))) && int_to_string(x) == s,

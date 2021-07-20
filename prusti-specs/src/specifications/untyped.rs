@@ -93,18 +93,6 @@ impl ToTokens for AnyFnItem {
     }
 }
 
-impl Assertion {
-    pub(crate) fn parse(
-        tokens: TokenStream,
-        spec_id: SpecificationId,
-        id_generator: &mut ExpressionIdGenerator,
-    ) -> syn::Result<Self> {
-        let mut parser = Parser::from_token_stream(tokens);
-        let assertion = parser.extract_assertion()?;
-        Ok(assertion.assign_id(spec_id, id_generator))
-    }
-}
-
 impl Parse for common::Expression<(), syn::Expr> {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         Ok(Self {
@@ -123,35 +111,6 @@ impl Parse for common::Assertion<(), syn::Expr, Arg> {
         Ok(Self {
             kind: Box::new(common::AssertionKind::Expr(input.parse()?)),
         })
-    }
-}
-
-impl Pledge {
-    pub(crate) fn parse(
-        tokens: TokenStream,
-        spec_id_lhs: Option<SpecificationId>,
-        spec_id_rhs: SpecificationId,
-        id_generator: &mut ExpressionIdGenerator,
-    ) -> syn::Result<Self> {
-        let mut parser = Parser::from_token_stream(tokens);
-        let pledge = if let Some(spec_id_lhs) = spec_id_lhs {
-            let pledge = parser.extract_pledge()?;
-            Pledge {
-                reference: pledge.reference.assign_id(spec_id_rhs, id_generator),
-                lhs: pledge.lhs.assign_id(spec_id_lhs, id_generator),
-                rhs: pledge.rhs.assign_id(spec_id_rhs, id_generator),
-            }
-        }
-        else {
-            let pledge = parser.extract_pledge_rhs_only()?;
-            assert!(pledge.lhs.is_none());
-            Pledge {
-                reference: pledge.reference.assign_id(spec_id_rhs, id_generator),
-                lhs: None,
-                rhs: pledge.rhs.assign_id(spec_id_rhs, id_generator),
-            }
-        };
-        Ok(pledge)
     }
 }
 

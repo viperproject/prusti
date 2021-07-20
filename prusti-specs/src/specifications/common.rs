@@ -55,10 +55,7 @@ pub struct SpecificationId(Uuid);
 pub enum SpecIdRef {
     Precondition(SpecificationId),
     Postcondition(SpecificationId),
-    Pledge {
-        lhs: Option<SpecificationId>,
-        rhs: SpecificationId,
-    },
+    Pledge(SpecificationId),
     Predicate(SpecificationId),
 }
 
@@ -111,9 +108,6 @@ pub(crate) struct ExpressionIdGenerator {
 }
 
 impl ExpressionIdGenerator {
-    pub(crate) fn new() -> Self {
-        Self { last_id: 100 }
-    }
     pub(crate) fn generate(&mut self) -> ExpressionId {
         self.last_id += 1;
         ExpressionId(self.last_id)
