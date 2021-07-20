@@ -30,6 +30,42 @@ pub type TriggerSet = common::TriggerSet<ExpressionId, syn::Expr>;
 /// A pledge that has not types associated with it.
 pub type Pledge = common::Pledge<ExpressionId, syn::Expr, Arg>;
 
+// TODO: syn Abstraction overall all tokenstreams in the crate
+// TODO: Specifically for processing the input of inner attribute
+// #[derive(Debug)]
+// pub struct CrateItem {
+//     inners: Vec<syn::Attribute>,
+//     items: Vec<syn::Item>,
+// }
+
+// impl syn::parse::Parse for CrateItem {
+//     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+//         let inners = syn::Attribute::parse_inner(input)?;
+//         let mut items = vec![];
+
+//         while !input.is_empty() {
+//             items.push(syn::Item::parse(input)?)
+//         }
+
+//         Ok(Self {
+//             inners,
+//             items,
+//         })
+//     }
+// }
+
+// impl ToTokens for CrateItem {
+//     fn to_tokens(&self, tokens: &mut TokenStream) {
+//         for inner in self.inners.clone() {
+//             tokens.extend(quote!(#inner))
+//         }
+
+//         for item in self.items.clone() {
+//             tokens.extend(quote!(#item))
+//         }
+//     }
+// }
+
 /// An abstraction over all kinds of function items.
 pub enum AnyFnItem {
     Fn(syn::ItemFn),

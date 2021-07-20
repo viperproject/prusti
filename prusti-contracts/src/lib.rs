@@ -23,6 +23,9 @@ mod private {
     /// A macro for writing a loop body invariant.
     pub use prusti_contracts_impl::body_invariant;
 
+    /// A macro for importing external specification
+    pub use prusti_contracts_impl::prusti_use;
+
     /// A macro for defining a closure with a specification.
     pub use prusti_contracts_impl::closure;
 
@@ -59,6 +62,9 @@ mod private {
 
     /// A macro for writing a loop body invariant.
     pub use prusti_contracts_internal::body_invariant;
+
+    /// A macro for importing external specification with a path
+    pub use prusti_contracts_internal::prusti_use;
 
     /// A macro for defining a closure with a specification.
     pub use prusti_contracts_internal::closure;

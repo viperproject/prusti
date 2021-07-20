@@ -11,8 +11,8 @@ pub mod specifications;
 
 use proc_macro2::{Span, TokenStream, TokenTree};
 use quote::{quote, quote_spanned, ToTokens};
-use syn::spanned::Spanned;
-use std::convert::TryInto;
+use syn::{spanned::Spanned};
+use std::{collections::hash_map::DefaultHasher, convert::{TryInto}, hash::{Hasher, Hash}, vec};
 
 use specifications::untyped;
 use parse_closure_macro::ClosureWithSpec;
@@ -304,6 +304,59 @@ pub fn body_invariant(tokens: TokenStream) -> TokenStream {
     }
 }
 
+pub fn prusti_use(tokens: TokenStream) -> TokenStream {
+    let path: syn::Path = handle_result!(syn::parse2(tokens.clone().into()));
+    let path_span = path.span();
+
+    match prusti_use_macro(path) {
+        Ok(macro_path) => parse_quote_spanned!(path_span => #macro_path!();),
+        Err(e) => e.to_compile_error()
+    }
+}
+
+fn prusti_use_macro(path: syn::Path) -> syn::Result<syn::Path> {
+    let span = path.span();
+    let segs = path.segments;
+    let mut macro_path = syn::Path {
+        leading_colon: None,
+        segments: syn::punctuated::Punctuated::new(),
+    };
+    let mut seg_iter = segs.into_iter();
+    if let Some(crate_seg) = seg_iter.next() {
+        macro_path.segments.push(crate_seg.to_owned());
+        if let Some(last_seg) = seg_iter.clone().last() {
+            let mut mod_path = syn::Path {
+                leading_colon: None,
+                segments: syn::punctuated::Punctuated::new(),
+            };
+            mod_path.segments.extend(seg_iter);
+            if let Some(seg) = mod_path.segments.last_mut() {
+                if let syn::PathArguments::AngleBracketed(genargs) =  &mut seg.arguments {
+                    genargs.colon2_token = Some(syn::token::Colon2::default());
+                }
+            }
+            let path_hash = {
+                let mut hasher = DefaultHasher::new();
+                mod_path.hash(&mut hasher);
+                hasher.finish()
+            };
+            macro_path.segments.push(syn::PathSegment {
+                ident: syn::Ident::new(format!("{}_{}", last_seg.ident, path_hash).as_str(), span),
+                arguments: syn::PathArguments::None,
+            });
+        } else {
+            macro_path.segments.push(syn::PathSegment {
+                ident: syn::Ident::new("crate_spec", span),
+                arguments: syn::PathArguments::None,
+            });
+        }
+
+        Ok(macro_path)
+    } else {
+        Err(syn::Error::new(span, "prusti_use must be given a path with non-empty segements"))
+    }
+}
+
 /// Unlike the functions above, which are only called from
 /// prusti-contracts-internal, this function also needs to be called
 /// from prusti-contracts-impl, because we still need to parse the
@@ -445,24 +498,18 @@ pub fn refine_trait_spec(_attr: TokenStream, tokens: TokenStream) -> TokenStream
     }
 }
 
+
 pub fn extern_spec(_attr: TokenStream, tokens:TokenStream) -> TokenStream {
     let item: syn::Item = handle_result!(syn::parse2(tokens));
     let item_span = item.span();
-    match item {
+    let tokens = match item {
         syn::Item::Impl(mut item_impl) => {
             let new_struct = handle_result!(
                 extern_spec_rewriter::generate_new_struct(&item_impl)
             );
 
-            let struct_ident = &new_struct.ident;
-            let generics = &new_struct.generics;
-
-            let struct_ty: syn::Type = parse_quote_spanned! {item_span=>
-                #struct_ident #generics
-            };
-
             let rewritten_item = handle_result!(
-                extern_spec_rewriter::rewrite_impl(&mut item_impl, Box::from(struct_ty))
+                extern_spec_rewriter::rewrite_impl(&mut item_impl, &new_struct)
             );
 
             quote_spanned! {item_span=>
@@ -475,13 +522,28 @@ pub fn extern_spec(_attr: TokenStream, tokens:TokenStream) -> TokenStream {
                 leading_colon: None,
                 segments: syn::punctuated::Punctuated::new(),
             };
-            handle_result!(extern_spec_rewriter::rewrite_mod(&mut item_mod, &mut path));
-            quote!(#item_mod)
+
+            let mut rewrite_path = syn::Path {
+                leading_colon: None,
+                segments: syn::punctuated::Punctuated::new(),
+            };
+
+            let mut macros = vec![];
+            handle_result!(extern_spec_rewriter::rewrite_mod(&mut item_mod, &mut path, &mut rewrite_path, &mut macros));
+
+            let mut macro_tokens = TokenStream::new();
+            macro_tokens.extend(macros.into_iter().map(|item_mac| quote!(#item_mac)));
+
+            parse_quote_spanned!{item_span =>
+                #macro_tokens
+                #item_mod
+                
+            }
         }
         _ => { unimplemented!() }
-    }
+    };
+    tokens
 }
-
 #[derive(Debug)]
 struct PredicateFn {
     fn_sig: syn::Signature,

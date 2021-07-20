@@ -1,0 +1,14 @@
+[package]
+name = "extern_option_spec"
+version = "0.1.0"
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+# extern-spec-crate = {path = "../../extern-spec-crate"}
+prusti-contracts = {path = "prusti-contracts"}
+# prusti-contracts = {path = "../../../../../prusti-contracts"}
+extern-spec-crate = {path = "extern-spec-crate"}
+
+[workspace]
