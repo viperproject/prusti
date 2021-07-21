@@ -9,6 +9,7 @@ on:
 env:
   RUST_BACKTRACE: 1
   PRUSTI_ASSERT_TIMEOUT: 60000
+  JAVA_HEAP_SIZE: 128
 
 jobs:
   # Run a subset of the tests that used to fail often.
