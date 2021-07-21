@@ -3312,14 +3312,20 @@ dependencies = [
 name = "vir"
 version = "0.1.0"
 dependencies = [
+ "config",
  "derivative",
  "index_vec",
+ "itertools",
+ "lazy_static",
+ "log 0.4.14",
  "proc-macro2",
  "quote",
+ "regex",
  "rsmt2",
  "serde 1.0.126",
  "syn",
  "thiserror",
+ "uuid 0.8.2",
  "vir-gen",
  "walkdir",
 ]

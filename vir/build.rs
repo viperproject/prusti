@@ -1,4 +1,3 @@
-  
 use quote::quote;
 use std::env;
 use std::io::Write;
@@ -13,6 +12,9 @@ fn main() {
     }
 
     let root = quote! { components =>
+        pub mod polymorphic;
+        pub mod legacy;
+        pub mod converter;
     };
     let tokens = define_vir(root, Path::new("defs/root.rs"));
     let out_dir = env::var("OUT_DIR").unwrap();
