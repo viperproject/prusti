@@ -67,6 +67,8 @@ def get_linux_env():
         else:
             variables.append(('LD_LIBRARY_PATH', ld_library_path))
     viper_home = get_var_or('VIPER_HOME', os.path.abspath('viper_tools/server'))
+    if not os.path.exists(viper_home):
+        viper_home = os.path.abspath('viper_tools/backends')
     if os.path.exists(viper_home):
         variables.append(('VIPER_HOME', viper_home))
     z3_exe = os.path.abspath(os.path.join(viper_home, '../z3/bin/z3'))
@@ -96,6 +98,8 @@ def get_mac_env():
             variables.append(('LD_LIBRARY_PATH', ld_library_path))
             variables.append(('DYLD_LIBRARY_PATH', ld_library_path))
     viper_home = get_var_or('VIPER_HOME', os.path.abspath('viper_tools/server'))
+    if not os.path.exists(viper_home):
+        viper_home = os.path.abspath('viper_tools/backends')
     if os.path.exists(viper_home):
         variables.append(('VIPER_HOME', viper_home))
     z3_exe = os.path.abspath(os.path.join(viper_home, '../z3/bin/z3'))
@@ -122,6 +126,9 @@ def get_win_env():
         else:
             variables.append(('PATH', library_path))
     viper_home = get_var_or('VIPER_HOME', os.path.abspath(os.path.join('viper_tools', 'server')))
+    viper_home = get_var_or('VIPER_HOME', os.path.abspath(os.path.join('viper_tools', 'server')))
+    if not os.path.exists(viper_home):
+        viper_home = get_var_or('VIPER_HOME', os.path.abspath(os.path.join('viper_tools', 'backends')))
     if os.path.exists(viper_home):
         variables.append(('VIPER_HOME', viper_home))
     else:

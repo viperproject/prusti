@@ -4,22 +4,17 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::env;
-use std::error::Error;
-use std::fs;
-use std::path::{Path, PathBuf};
-use std::process::Command;
-
-use rustwide::{
-    cmd,
-    Crate,
-    Toolchain,
-    WorkspaceBuilder,
-    logging,
-    logging::LogStorage,
+use std::{
+    env,
+    error::Error,
+    fs,
+    path::{Path, PathBuf},
+    process::Command,
 };
+
+use log::{error, info, warn, LevelFilter};
+use rustwide::{cmd, logging, logging::LogStorage, Crate, Toolchain, WorkspaceBuilder};
 use serde::Deserialize;
-use log::{info, warn, error, LevelFilter};
 
 #[derive(Debug, Deserialize)]
 struct CrateRecord {
@@ -55,7 +50,9 @@ impl cmd::Runnable for CargoPrusti {
     }
 
     fn prepare_command<'w, 'pl>(&self, cmd: cmd::Command<'w, 'pl>) -> cmd::Command<'w, 'pl> {
-        let java_home = self.java_home.as_ref()
+        let java_home = self
+            .java_home
+            .as_ref()
             .map(|p| p.to_str().unwrap())
             .unwrap_or("/usr/lib/jvm/default-java");
         cmd.env("VIPER_HOME", self.viper_home.to_str().unwrap())
@@ -78,8 +75,8 @@ struct RustToolchain {
 
 fn get_rust_toolchain() -> RustToolchain {
     let content = include_str!("../../rust-toolchain");
-    let rust_toolchain: RustToolchainFile = toml::from_str(content)
-        .expect("failed to parse rust-toolchain file");
+    let rust_toolchain: RustToolchainFile =
+        toml::from_str(content).expect("failed to parse rust-toolchain file");
     rust_toolchain.toolchain
 }
 
@@ -104,6 +101,14 @@ pub fn find_java_home() -> Option<PathBuf> {
         })
 }
 
+/// Collect the directories containing java policy files.
+pub fn collect_java_policies() -> Vec<PathBuf> {
+    glob::glob("/etc/java-*")
+        .unwrap()
+        .map(|result| result.unwrap())
+        .collect()
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     color_backtrace::install();
     setup_logs();
@@ -114,15 +119,19 @@ fn main() -> Result<(), Box<dyn Error>> {
     } else {
         Path::new("target/release")
     };
-    let host_viper_home = Path::new("viper_tools/server");
+    let host_viper_home = Path::new("viper_tools/backends");
     let host_z3_home = Path::new("viper_tools/z3/bin");
-    let host_java_home = env::var("JAVA_HOME").ok().map(|s| s.into())
+    let host_java_home = env::var("JAVA_HOME")
+        .ok()
+        .map(|s| s.into())
         .or_else(find_java_home)
         .expect("Please set JAVA_HOME");
+    let host_java_policies = collect_java_policies();
     let guest_prusti_home = Path::new("/opt/rustwide/prusti-home");
     let guest_viper_home = Path::new("/opt/rustwide/viper-home");
     let guest_z3_home = Path::new("/opt/rustwide/z3-home");
-    let guest_java_home = Path::new("/opt/rustwide/java-home");
+    // Map JAVA at exactly the same location on the guest so that symlinks work.
+    let guest_java_home = host_java_home.clone();
 
     info!("Using host's Java home {:?}", host_java_home);
     let cargo_prusti = CargoPrusti {
@@ -133,10 +142,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
 
     info!("Crate a new workspace...");
-    let workspace = WorkspaceBuilder::new(
-        workspace_path,
-        "prusti-test-crates"
-    ).init()?;
+    let workspace = WorkspaceBuilder::new(workspace_path, "prusti-test-crates").init()?;
 
     info!("Install the toolchain...");
     let rust_toolchain = get_rust_toolchain();
@@ -151,15 +157,15 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     info!("Read lists of crates...");
     // TODO: do something to freeze the version of the dependencies.
-    let crates_list: Vec<Crate> = csv::Reader::from_reader(
-       fs::File::open("test-crates/crates.csv")?
-    ).deserialize()
-        .collect::<Result<Vec<CrateRecord>, _>>()?
-        .into_iter()
-        .map(|c| c.into())
-        // For the moment, test only a few of the crates.
-        .take(2)
-        .collect();
+    let crates_list: Vec<Crate> =
+        csv::Reader::from_reader(fs::File::open("test-crates/crates.csv")?)
+            .deserialize()
+            .collect::<Result<Vec<CrateRecord>, _>>()?
+            .into_iter()
+            .map(|c| c.into())
+            // For the moment, test only a few of the crates.
+            .take(2)
+            .collect();
 
     // List of crates that don't compile with the standard compiler.
     let mut skipped_crates = vec![];
@@ -186,11 +192,9 @@ fn main() -> Result<(), Box<dyn Error>> {
             let mut storage = LogStorage::new(LevelFilter::Info);
             storage.set_max_size(1024 * 1024);
 
-            let build_status =  build_dir.build(&toolchain, &krate, sandbox).run(|build| {
+            let build_status = build_dir.build(&toolchain, &krate, sandbox).run(|build| {
                 logging::capture(&storage, || {
-                    build.cargo()
-                        .args(&["check"])
-                        .run()?;
+                    build.cargo().args(&["check"]).run()?;
                     Ok(())
                 })
             });
@@ -209,20 +213,33 @@ fn main() -> Result<(), Box<dyn Error>> {
         {
             let mut build_dir = workspace.build_dir(&format!("verify_{}", index));
 
-            let sandbox = cmd::SandboxBuilder::new()
+            let mut sandbox = cmd::SandboxBuilder::new()
                 .memory_limit(Some(1024 * 1024 * 1024))
                 .enable_networking(false)
-                .mount(&host_prusti_home, &guest_prusti_home, cmd::MountKind::ReadOnly)
-                .mount(&host_viper_home, &guest_viper_home, cmd::MountKind::ReadOnly)
+                .mount(
+                    &host_prusti_home,
+                    &guest_prusti_home,
+                    cmd::MountKind::ReadOnly,
+                )
+                .mount(
+                    &host_viper_home,
+                    &guest_viper_home,
+                    cmd::MountKind::ReadOnly,
+                )
                 .mount(&host_z3_home, &guest_z3_home, cmd::MountKind::ReadOnly)
                 .mount(&host_java_home, &guest_java_home, cmd::MountKind::ReadOnly);
+            for java_policy_path in &host_java_policies {
+                sandbox =
+                    sandbox.mount(java_policy_path, java_policy_path, cmd::MountKind::ReadOnly);
+            }
 
             let mut storage = LogStorage::new(LevelFilter::Info);
             storage.set_max_size(1024 * 1024);
 
             let verification_status = build_dir.build(&toolchain, &krate, sandbox).run(|build| {
                 logging::capture(&storage, || {
-                    build.cmd(&cargo_prusti)
+                    build
+                        .cmd(&cargo_prusti)
                         .env("RUST_BACKTRACE", "1")
                         .env("PRUSTI_ASSERT_TIMEOUT", "60000")
                         .env("PRUSTI_CHECK_PANICS", "false")
